@@ -158,3 +158,13 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 - The database is kept whole (history, and the record that stops paid re-checks); only the export and the Drive copy are filtered. `npm run snapshot` writes both exports.
 - **Raw API responses are gone and no longer saved** (`STORE_RAW=false` by default; `CLAUDE.md` convention updated). About 300 MB deleted locally, `checks.raw_path` cleared, and the one raw archive on Drive moved to the Drive trash.
 - Drive `outputs/` now: **yellowbook usable contacts (2026-11-19)** (the owner's list) and `yellowbook_2026-11-19_current.sqlite.gz` (restore this one). Older copies are kept with their dates.
+
+## Batch 3 (run 5, 2026-11-19): first grouped run
+
+- Scope: all roles, population 300k and up. 1,137 seats sent as 284 requests (about 4 seats each). $9.20, **0.8 cents a seat** (batch 2, per seat: 2.5 cents). The planner estimated $21: it still prices seats one at a time.
+- Final per seat: 485 confirmed, 267 replaced, 77 role mismatch, 21 vacant or interim, 194 unclear, 93 unable to confirm.
+- **Usable contacts now 848** (300 Verified, 548 Probably fine); batch 3 added 505.
+- 5 seats errored: one grouped request read a document so large the prompt passed the 1M-token limit (PDFs are not capped by `max_content_tokens`). Not retried (invalid_request). Rare, 1 request in 284.
+- 138 of 500 grouped requests still crossed Haiku's 100k price step. Room to tune (fewer fetches per group, or 6k pages), but already 3x cheaper.
+- Drive: **yellowbook usable contacts (after batch 3)** and `yellowbook_2026-11-19_after-batch-3.sqlite.gz` (restore this one). The database is 2.2 MB compressed; it will pass the connector's ~3.1 MB limit within a few batches, so split it or find larger storage before then.
+- **Remaining:** about 6,300 seats below population 300k. At 0.8 cents a seat, roughly $50 for all of them.
