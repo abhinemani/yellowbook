@@ -191,6 +191,12 @@ export interface ProcessResult {
   escalated: boolean;
 }
 
+/** A request the API rejected as malformed or forbidden (4xx other than 408/409/429) fails the same way every time; do not resend it. */
+export function isRetryableStatus(status: number | undefined): boolean {
+  if (status === undefined) return true; // network error or timeout
+  return status >= 500 || status === 408 || status === 409 || status === 429;
+}
+
 /** Turn one API outcome into a stored check (or a retry). The only place results enter the database. */
 export function processOutcome(db: Db, runId: number, item: ItemRow, outcome: Outcome, batch: boolean, c: Config = cfg()): ProcessResult {
   const run = getRun(db, runId);
@@ -365,7 +371,7 @@ export async function runSync(db: Db, client: Anthropic, runId: number, c: Confi
           const message = await callMessages(client, buildParams(seat, item.tier, run.kind, new Date(), c));
           outcome = { kind: 'message', message };
         } catch (e) {
-          outcome = { kind: 'error', error: (e as Error).message, retryable: true };
+          outcome = { kind: 'error', error: (e as Error).message, retryable: isRetryableStatus((e as { status?: number }).status) };
         }
         const res = processOutcome(db, runId, { ...item, state: 'submitted' }, outcome, false, c);
         done++;

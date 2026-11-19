@@ -252,3 +252,14 @@ describe('escalation', () => {
     expect(needsEscalation({ status: 'unable_to_confirm', confidence: null, unresolved_reason: 'model_error' })).toBe(false);
   });
 });
+
+import { isRetryableStatus } from '../src/lib/runs';
+describe('sync retry policy', () => {
+  it('does not resend requests the API rejected as invalid', () => {
+    expect(isRetryableStatus(400)).toBe(false);
+    expect(isRetryableStatus(403)).toBe(false);
+  });
+  it('resends overload, rate-limit and network failures', () => {
+    for (const s of [429, 500, 529, 408, undefined]) expect(isRetryableStatus(s)).toBe(true);
+  });
+});
