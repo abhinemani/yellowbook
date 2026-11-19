@@ -79,7 +79,10 @@ async function watch(db: ReturnType<typeof openDb>, runId: number) {
     if (open === 0 || run.status === 'canceled') break;
     const planned = (db.prepare(`SELECT COUNT(*) n FROM run_items WHERE run_id = ? AND state = 'planned'`).get(runId) as { n: number }).n;
     const submitted = open - planned;
-    if (submitted === 0 && w.submitted === 0) { console.log('Nothing in flight and the cap holds the rest. Raise --cap or MAX_RUN_COST_USD and run watch again.'); break; }
+    // Results just collected can plan the next tier: submit those at once instead of reading "nothing in flight" as a cap stop.
+    if (c.escalated > 0 && submitted === 0) continue;
+    if (submitted === 0 && w.submitted === 0 && w.deferredForCap > 0) { console.log('Nothing in flight and the cap holds the rest. Raise --cap or MAX_RUN_COST_USD and run watch again.'); break; }
+    if (submitted === 0 && w.submitted === 0) { console.log(`Nothing in flight; ${planned} planned item(s) were not sent. Run watch again.`); break; }
     console.log(`waiting: ${submitted} in flight, ${planned} planned. Next check in ${every / 1000}s`);
     await new Promise((r) => setTimeout(r, every));
   }
