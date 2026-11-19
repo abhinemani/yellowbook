@@ -64,6 +64,8 @@ export function selectSeats(db: Db, scope: Scope = {}): SeatContext[] {
   const args: Record<string, unknown> = { stale: `-${c.staleMonths} months`, cool: `-${c.cooldownDays} days` };
 
   where.push(scope.kind === 'discover' ? 's.current_contact_id IS NULL' : 's.current_contact_id IS NOT NULL');
+  // An extra holder slot of a single-holder role that has been emptied is not a seat to fill.
+  if (scope.kind === 'discover') where.push('(s.slot = 1 OR r.multi = 1)');
   if (scope.roles?.length) where.push(`s.role_key IN (${scope.roles.map((_, i) => `@role${i}`).join(',')})`);
   scope.roles?.forEach((v, i) => (args[`role${i}`] = v));
   if (scope.states?.length) where.push(`a.state IN (${scope.states.map((_, i) => `@st${i}`).join(',')})`);

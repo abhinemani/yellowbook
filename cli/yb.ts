@@ -25,7 +25,7 @@ const HELP = `yellowbook CLI
   yb compare <earlier_checked.csv>   compare stored checks with an earlier manual pass (benchmark)
 
 scope:  --roles head_of_purchasing,head_of_finance  --states MO,KS  --category county  --min-pop 50000  --max-pop N
-        --limit 25  --kind verify|discover  --max-tier 1|2|3  --cap 25 (USD)  --include-fresh  --ignore-cooldown
+        --seats 12,34 (seat ids)  --limit 25  --kind verify|discover  --max-tier 1|2|3  --cap 25 (USD)  --include-fresh  --ignore-cooldown
 `;
 
 const { values: v, positionals } = parseArgs({
@@ -35,7 +35,7 @@ const { values: v, positionals } = parseArgs({
     'min-pop': { type: 'string' }, 'max-pop': { type: 'string' }, limit: { type: 'string' },
     kind: { type: 'string' }, 'max-tier': { type: 'string' }, cap: { type: 'string' },
     sync: { type: 'boolean' }, yes: { type: 'boolean' }, 'include-fresh': { type: 'boolean' }, 'ignore-cooldown': { type: 'boolean' },
-    interval: { type: 'string' },
+    interval: { type: 'string' }, seats: { type: 'string' },
   },
 });
 const [cmd, ...rest] = positionals;
@@ -47,6 +47,7 @@ function scope(): Scope {
     minPop: v['min-pop'] ? Number(v['min-pop']) : undefined, maxPop: v['max-pop'] ? Number(v['max-pop']) : undefined,
     limit: v.limit ? Number(v.limit) : undefined, kind: (v.kind as RunKind | undefined) ?? 'verify',
     includeFresh: v['include-fresh'], ignoreCooldown: v['ignore-cooldown'],
+    seatIds: list(v.seats)?.map(Number),
   };
 }
 const runOpts = () => ({ kind: scope().kind, maxTier: v['max-tier'] ? (Number(v['max-tier']) as Tier) : undefined, batch: v.sync ? false : undefined, capUsd: v.cap ? Number(v.cap) : undefined });

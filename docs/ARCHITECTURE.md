@@ -7,7 +7,7 @@ Status: built (TypeScript, Next.js, SQLite) and tested against faked API respons
 1. **Holds agencies and their contacts.** An agency (county, city, township) has many *seats*: Head of Purchasing, Head of Finance, Top Appointed Executive, and so on. Each seat has a current contact.
 2. **Verifies any seat.** Pick roles, agencies and a scope (for example "Head of Finance, counties over 250k, not checked in 12 months"). The app asks Claude, with web search and page fetch turned on, whether each listed person still holds the seat. If not, it finds the current holder.
 3. **Lets you add agencies and seats as you find them.** Search the database; if the agency is missing, look it up on the web, confirm, add it, then discover contacts for whichever roles you want.
-4. **Keeps a human in the loop.** Findings land in a review queue. Accepting a replacement creates a new contact and supersedes the old one. History is never overwritten.
+4. **Applies findings, keeps history.** By default (`REVIEW_MODE=auto`, owner decision 2026-11-19) findings are applied as they arrive: a clear replacement creates a new contact and supersedes the old one; an unclear or Low-confidence name is added as a second holder in a new slot. History is never overwritten. `REVIEW_MODE=queue` sends findings to the review queue instead.
 5. **Imports and exports Power Almanac CSVs** (all roles, one file or many).
 
 ## Components
