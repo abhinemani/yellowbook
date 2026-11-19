@@ -70,6 +70,10 @@ The working files from the session were in the Claude.ai workspace and were sent
 4. **Bulk runs** by role, largest first, within the spend cap: `npm run run -- --roles head_of_purchasing --yes`, then `npm run yb -- watch <id>`.
 5. **Not built yet:** scheduled re-checks; authentication and multi-user (needed for any hosted deployment); editing a contact by hand; an in-app background poller for batches (today: the Check for results button or `yb watch`); keyboard shortcuts in the review queue; a role-definition editor (add only).
 
+## Cloud session setup (2026-11-19)
+
+Verified in a fresh cloud container: `npm ci`, `npm test` (63 pass), `npm run typecheck`, `npm run build`, `npm run plan` and every main screen under `npm run dev` all work. `api.anthropic.com` is reachable (401 without a key). The cloud environment now has a setup script that runs `npm ci` and copies `.env.example` to `.env` when this repo is present. No `ANTHROPIC_API_KEY` is set for this project yet, and `data/` is empty, so the pilot (next step 1) still needs the four CSVs and a key.
+
 ## Gotchas
 
 - Contact data is about real people. Keep it out of git, logs, tests and issues. Tests use invented data ("Example County").
