@@ -138,3 +138,14 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 - Expect more people per role in exports, especially in small agencies where Low confidence is common.
 
 **Batch plan** (not yet sent; the owner approves before sending): 12 batches, about $152 expected and $185 at most, in batch mode. Batch 1 is the 25 largest manual "unable to confirm" purchasing seats (`--seats`). Batches 2-11 are each of the five main roles split at its median population. Batch 12 is the other 14 roles. Run batches 1 and 2 first, then re-check cost and escalation.
+
+## Batches 1 and 2, email domains, grouped requests (2026-11-19)
+
+- **Batch 1** (run 3, the 25 hardest purchasing seats): 9 confirmed, 6 replaced, 8 unclear (names added beside the holder), 1 interim, 1 still unable. $0.95.
+- **Batch 2** (run 4, 690 purchasing seats at population 107k and up): 246 confirmed, 138 replaced, 47 role mismatch, 15 vacant or interim, 151 unclear, 93 unable to confirm. $17.35 (estimated $13). 58 purchasing seats now have extra holders. 20 retries were re-sent under the new limits.
+- **Fixes during the runs:** `watch` stopped after tier-1 results instead of sending the escalations, and stopped on retries; `MAX_OUTPUT_TOKENS` 1500 → 3000 (5 of 739 responses hit it).
+- **Email domains** (`yb domains`, schema v2): DNS over HTTPS (plain DNS is blocked in the container), domain names only. 1,993 of 2,017 domains receive mail; 24 active contacts sit on domains that cannot. Exported as "Email Domain Status". Paid mailbox verification not added (needs the license answer, D-3).
+- **Grouped requests** (schema v3, `GROUP_BY_AGENCY=true`, batch runs only): one request per agency and tier, split back into per-seat checks through `finalize`, `applyRules` and `processOutcome`, so every rule still applies per seat; the raw response is stored once per group. Validated live twice. Sync runs stay per seat.
+- **The 100k price step** (see `docs/COST.md`): `MAX_CONTENT_TOKENS` 12,000 → 8,000; grouped requests get +1 fetch and +1 search.
+
+**Next:** run batches 3-12 (grouped). Run one, compare its measured cost per seat with batch 2, then continue.

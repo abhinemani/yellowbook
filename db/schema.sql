@@ -113,9 +113,11 @@ CREATE TABLE IF NOT EXISTS run_items (
   attempts     INTEGER NOT NULL DEFAULT 0,
   check_id     INTEGER,
   error        TEXT,
+  request_id   TEXT,                                        -- v3: shared by items sent together in one grouped request
   UNIQUE (run_id, seat_id, tier)
 );
 CREATE INDEX IF NOT EXISTS idx_items_run ON run_items(run_id, state);
+CREATE INDEX IF NOT EXISTS idx_items_request ON run_items(request_id);
 
 -- One verification attempt on one seat. Append-only.
 CREATE TABLE IF NOT EXISTS checks (

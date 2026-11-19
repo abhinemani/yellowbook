@@ -39,10 +39,13 @@ export function cfg() {
     t1MaxFetches: num('T1_MAX_FETCHES', 4),
     t2MaxSearches: num('T2_MAX_SEARCHES', 2),
     t2MaxFetches: num('T2_MAX_FETCHES', 3),
-    maxContentTokens: num('MAX_CONTENT_TOKENS', 12000),
+    /** Per fetched page. Kept low so a request stays under Haiku 5.5's 100k-token price step (5x above it). */
+    maxContentTokens: num('MAX_CONTENT_TOKENS', 8000),
     maxOutputTokens: num('MAX_OUTPUT_TOKENS', 3000),
 
     useBatch: bool('USE_BATCH', true),
+    /** Batch runs send all due seats of one agency at one tier as a single request (cheaper; shared evidence). */
+    groupByAgency: bool('GROUP_BY_AGENCY', true),
     batchChunk: num('BATCH_CHUNK', 5000),
     syncConcurrency: num('SYNC_CONCURRENCY', 4),
 

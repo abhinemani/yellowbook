@@ -276,3 +276,127 @@ export async function callMessages(client: Anthropic, params: Params, maxContinu
   }
   return { content, usage, stop_reason: stop };
 }
+
+// ---------- grouped requests: every due seat at one agency in a single call ----------
+
+/** Seat references used in a grouped prompt and its results: S1, S2, ... in the order given. */
+export const seatRef = (i: number) => `S${i + 1}`;
+
+/** Cap on seats per grouped request, so the answer fits comfortably in the output budget. */
+export const MAX_GROUP = 8;
+
+let groupSchema: Record<string, unknown> | null = null;
+export function groupOutputSchema(): Record<string, unknown> {
+  if (groupSchema) return groupSchema;
+  const one = outputSchema() as { properties: Record<string, unknown>; required: string[] };
+  groupSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['results'],
+    properties: {
+      results: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['seat_ref', ...one.required],
+          properties: { seat_ref: { type: 'string', description: 'The seat reference from the prompt, e.g. S1.' }, ...one.properties },
+        },
+      },
+    },
+  };
+  return groupSchema;
+}
+
+/** One request for several seats of the same agency at the same tier. Same tools and limits per tier, scaled for the group. */
+export function buildGroupParams(seats: SeatContext[], tier: Tier, today: Date, c: Config = cfg()): Params {
+  if (seats.length < 2) throw new Error('A group needs at least two seats');
+  const a = seats[0];
+  if (seats.some((s) => s.agencyId !== a.agencyId)) throw new Error('A group must be one agency');
+  const urls = [...new Set(seats.flatMap((s) => startUrls(s)))];
+  // One extra fetch and search for the whole group, no more: every fetched page is re-read on each later step, and
+  // a request whose input passes 100k tokens is billed at 5x on Haiku 5.5 (docs/COST.md).
+  const fetchMax = (tier === 1 ? c.t1MaxFetches : c.t2MaxFetches) + 1;
+  const searches = c.t2MaxSearches + 1;
+  const hints = [...new Set(seats.flatMap((s) => s.titleHints))].join(', ');
+  const toolText = render(loadPrompt(tier === 1 ? 'tools_fetch_only' : 'tools_search'), {
+    agency_name: a.agencyName,
+    role_label: 'staff directory',
+    title_hints: hints,
+    max_fetches: fetchMax,
+    max_searches: searches,
+  });
+  const blocks = seats
+    .map((s, i) => {
+      const who = s.contactId
+        ? `Listed contact: ${[s.contactName, s.contactTitle, s.contactEmail, s.contactPhone].map((x) => x || 'not on file').join(', ')} (last verified ${s.sourceLastVerified || 'not on file'})`
+        : 'No contact on file: find who holds it now.';
+      return `- **${seatRef(i)}: ${s.roleLabel}${s.slot > 1 ? ` (#${s.slot})` : ''}.** What counts: ${s.roleDefinition}\n  ${who}`;
+    })
+    .join('\n');
+  const user = render(loadPrompt('verify_agency'), {
+    today: today.toISOString().slice(0, 10),
+    agency_name: a.agencyName,
+    agency_category: a.category,
+    agency_state: a.state,
+    agency_county_clause: a.county && a.category !== 'county' ? `, ${a.county} County` : '',
+    start_urls: urls.length ? urls.map((u) => `- ${u}`).join('\n') : '- (no website on file: search for the official site)',
+    seat_blocks: blocks,
+    tool_instructions: toolText,
+  });
+  const tools: Params['tools'] =
+    tier === 1
+      ? [{ type: 'web_fetch_20250910', name: 'web_fetch', max_uses: fetchMax, max_content_tokens: c.maxContentTokens, allowed_domains: [...new Set(urls.map((u) => hostOf(u)).filter((h): h is string => !!h))], allowed_callers: ['direct'] }]
+      : [
+          { type: 'web_search_20250305', name: 'web_search', max_uses: searches, blocked_domains: BLOCKED_DOMAINS, allowed_callers: ['direct'] },
+          { type: 'web_fetch_20250910', name: 'web_fetch', max_uses: fetchMax, max_content_tokens: c.maxContentTokens, blocked_domains: BLOCKED_DOMAINS, allowed_callers: ['direct'] },
+        ];
+  return {
+    model: modelFor(tier, c),
+    max_tokens: Math.min(16000, c.maxOutputTokens + 700 * seats.length),
+    system: loadPrompt('system'),
+    tools,
+    output_config: { format: { type: 'json_schema', schema: groupOutputSchema() } },
+    messages: [{ role: 'user', content: user }],
+  } as Params;
+}
+
+type Msg = Pick<Message, 'content' | 'usage' | 'stop_reason'>;
+
+/**
+ * Split a grouped response into one message per seat, so each goes through finalize and applyRules exactly as a
+ * single-seat response would: every seat sees all the tool blocks (the shared evidence), then its own JSON as the
+ * final text. Usage is divided evenly so stored costs add up to what the call cost. A seat missing from the
+ * answer gets an empty text block, which fails validation and is retried.
+ */
+export function splitGroupMessage(message: Msg, n: number): Msg[] {
+  let parsed: { results?: { seat_ref?: string }[] } | null = null;
+  try {
+    parsed = parseModelJson(message.content as unknown[]) as { results?: { seat_ref?: string }[] };
+  } catch {
+    parsed = null;
+  }
+  const blocks = message.content as unknown as LooseBlock[];
+  const tools = blocks.filter((b) => b.type !== 'text' && b.type !== 'thinking' && b.type !== 'redacted_thinking');
+  // Citations on the original text carry verbatim page text (used by the email-on-page check): keep them for every seat.
+  const citations = blocks.filter((b) => b.type === 'text' && Array.isArray(b.citations)).flatMap((b) => b.citations as unknown[]);
+  const u = message.usage as Message['usage'] & { server_tool_use?: { web_search_requests?: number; web_fetch_requests?: number } | null };
+  const share = (x: number | null | undefined) => (x ?? 0) / n;
+  const usage = {
+    ...u,
+    input_tokens: share(u.input_tokens),
+    output_tokens: share(u.output_tokens),
+    cache_creation_input_tokens: share(u.cache_creation_input_tokens),
+    cache_read_input_tokens: share(u.cache_read_input_tokens),
+    server_tool_use: { web_search_requests: share(u.server_tool_use?.web_search_requests), web_fetch_requests: share(u.server_tool_use?.web_fetch_requests) },
+  } as unknown as Message['usage'];
+  return Array.from({ length: n }, (_, i) => {
+    const r = parsed?.results?.find((x) => x?.seat_ref === seatRef(i));
+    let text = '';
+    if (r) {
+      const { seat_ref: _ref, ...rest } = r;
+      text = JSON.stringify(rest);
+    }
+    return { content: [...tools, { type: 'text', text, citations: citations.length ? citations : null }] as unknown as Message['content'], usage, stop_reason: message.stop_reason };
+  });
+}

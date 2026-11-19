@@ -14,7 +14,7 @@ interface RoleSeed {
   multi?: boolean;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /** Open (and if needed create) the database, apply db/schema.sql, seed roles from config/roles.json. */
 export function openDb(file: string = cfg().databasePath): Db {

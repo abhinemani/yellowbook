@@ -48,13 +48,15 @@ describe('migrations', () => {
   it('upgrades a v1 database to the current schema without touching its data', () => {
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'yb-mig-')), 'v1.sqlite');
     const raw = new Database(file);
-    const schema = fs.readFileSync('db/schema.sql', 'utf8').split('-- v2:')[0];
+    const schema = fs.readFileSync('db/schema.sql', 'utf8').split('-- v2:')[0]
+      .split('\n').filter((l) => !l.includes('request_id')).join('\n');
     raw.exec(schema);
     raw.pragma('user_version = 1');
     raw.prepare(`INSERT INTO agencies (name, category, state) VALUES ('Example County', 'county', 'OH')`).run();
     raw.close();
     const db = openDb(file);
-    expect(db.pragma('user_version', { simple: true })).toBe(2);
+    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    expect((db.prepare(`SELECT COUNT(*) n FROM pragma_table_info('run_items') WHERE name = 'request_id'`).get() as { n: number }).n).toBe(1);
     expect(db.prepare(`SELECT name FROM sqlite_master WHERE name = 'email_domains'`).get()).toBeTruthy();
     expect((db.prepare('SELECT COUNT(*) n FROM agencies').get() as { n: number }).n).toBe(1);
   });

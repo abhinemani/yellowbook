@@ -8,13 +8,15 @@ import { applyCheck } from './review';
 import { needsEscalation } from './rules';
 import { getSeatContext, selectSeats, type Scope } from './seats';
 import type { Evidence, FinalCheck, RunKind, SeatContext, Tier } from './types';
-import { buildParams, callMessages, finalize, firstTier, modelErrorCheck, modelFor } from './verifier';
+import { buildGroupParams, buildParams, callMessages, finalize, firstTier, MAX_GROUP, modelErrorCheck, modelFor, splitGroupMessage } from './verifier';
 
 export interface RunOptions {
   kind?: RunKind;
   maxTier?: Tier;
   batch?: boolean;
   capUsd?: number;
+  /** Batch runs: send all due seats of one agency at one tier as a single request. Default from GROUP_BY_AGENCY. */
+  group?: boolean;
 }
 
 interface RunRow {
@@ -36,12 +38,14 @@ interface ItemRow {
   state: string;
   batch_id: string | null;
   attempts: number;
+  request_id?: string | null;
 }
 
 const MAX_ATTEMPTS = 2; // a bad response is retried once, then recorded as model_error
 
-function runOptions(run: RunRow): { maxTier: Tier; batch: boolean } {
-  return JSON.parse(run.options_json) as { maxTier: Tier; batch: boolean };
+function runOptions(run: RunRow): { maxTier: Tier; batch: boolean; group: boolean } {
+  const o = JSON.parse(run.options_json) as { maxTier: Tier; batch: boolean; group?: boolean };
+  return { ...o, group: !!o.group }; // runs created before grouping existed stay per seat
 }
 
 export function getRun(db: Db, runId: number): RunRow {
@@ -61,12 +65,13 @@ export function createRun(db: Db, scope: Scope, opts: RunOptions = {}, c: Config
   const kind = opts.kind ?? scope.kind ?? 'verify';
   const maxTier = opts.maxTier ?? c.maxTier;
   const batch = opts.batch ?? c.useBatch;
+  const group = batch && (opts.group ?? c.groupByAgency);
   const { seats, estimate } = planRun(db, scope, { ...opts, kind }, c);
   const model = modelFor(1, c);
   const runId = db.transaction(() => {
     const info = db
       .prepare(`INSERT INTO runs (kind, scope_json, model, status, est_cost_usd, spend_cap_usd, options_json) VALUES (?,?,?,?,?,?,?)`)
-      .run(kind, JSON.stringify({ ...scope, kind }), model, 'queued', estimate.expectedTotalUsd, opts.capUsd ?? c.maxRunCostUsd, JSON.stringify({ maxTier, batch }));
+      .run(kind, JSON.stringify({ ...scope, kind }), model, 'queued', estimate.expectedTotalUsd, opts.capUsd ?? c.maxRunCostUsd, JSON.stringify({ maxTier, batch, group }));
     const id = Number(info.lastInsertRowid);
     const ins = db.prepare(`INSERT OR IGNORE INTO run_items (run_id, seat_id, tier, custom_id) VALUES (?,?,?,?)`);
     for (const s of seats) {
@@ -105,6 +110,25 @@ export interface WaveResult {
   batchIds: string[];
 }
 
+/** Items of the same agency (already one tier), in item order, at most MAX_GROUP per request. */
+function groupItems(db: Db, items: ItemRow[]): ItemRow[][] {
+  const agencyOf = db.prepare(`SELECT agency_id FROM seats WHERE id = ?`);
+  const by = new Map<number, ItemRow[]>();
+  for (const it of [...items].sort((a, b) => a.id - b.id)) {
+    const ag = (agencyOf.get(it.seat_id) as { agency_id: number }).agency_id;
+    if (!by.has(ag)) by.set(ag, []);
+    by.get(ag)!.push(it);
+  }
+  const out: ItemRow[][] = [];
+  for (const list of by.values()) for (let i = 0; i < list.length; i += MAX_GROUP) out.push(list.slice(i, i + MAX_GROUP));
+  return out;
+}
+
+/** Unique per submission (attempt count included), at most 64 characters as the Batches API requires. */
+function groupRequestId(unit: ItemRow[]): string {
+  return `r${unit[0].run_id}-g${unit[0].id}-n${unit.length}-a${Math.max(...unit.map((u) => u.attempts))}`;
+}
+
 /** Send planned items to the Batches API, within the run's spend cap. */
 export async function submitWave(db: Db, client: Anthropic, runId: number, c: Config = cfg()): Promise<WaveResult> {
   const run = getRun(db, runId);
@@ -126,20 +150,29 @@ export async function submitWave(db: Db, client: Anthropic, runId: number, c: Co
     const send = items.slice(0, afford);
     deferred += items.length - send.length;
     budget -= send.length * per;
-    for (let i = 0; i < send.length; i += c.batchChunk) {
-      const chunk = send.slice(i, i + c.batchChunk);
-      const requests = chunk.map((item) => {
-        const seat = getSeatContext(db, item.seat_id)!;
-        return { custom_id: item.custom_id, params: buildParams(seat, tier, run.kind, today, c) };
+    // One request per item, or (grouped runs) one per agency with two or more due seats at this tier.
+    const units = opts.group ? groupItems(db, send) : send.map((item) => [item]);
+    for (let i = 0; i < units.length; i += c.batchChunk) {
+      const chunk = units.slice(i, i + c.batchChunk);
+      const requests = chunk.map((unit) => {
+        if (unit.length === 1) {
+          const seat = getSeatContext(db, unit[0].seat_id)!;
+          return { custom_id: unit[0].custom_id, params: buildParams(seat, tier, run.kind, today, c) };
+        }
+        const seats = unit.map((it) => getSeatContext(db, it.seat_id)!);
+        return { custom_id: groupRequestId(unit), params: buildGroupParams(seats, tier, today, c) };
       });
       const batch = await client.messages.batches.create({ requests });
       db.transaction(() => {
-        const up = db.prepare(`UPDATE run_items SET state = 'submitted', batch_id = ? WHERE id = ?`);
-        for (const item of chunk) up.run(batch.id, item.id);
+        const up = db.prepare(`UPDATE run_items SET state = 'submitted', batch_id = ?, request_id = ? WHERE id = ?`);
+        for (const unit of chunk) {
+          const rid = unit.length > 1 ? groupRequestId(unit) : null;
+          for (const item of unit) up.run(batch.id, rid, item.id);
+        }
         db.prepare(`UPDATE runs SET status = 'running', batch_id = COALESCE(batch_id, ?) WHERE id = ?`).run(batch.id, runId);
       })();
       batchIds.push(batch.id);
-      submitted += chunk.length;
+      submitted += chunk.reduce((n, u) => n + u.length, 0);
     }
   }
   return { submitted, deferredForCap: deferred, batchIds };
@@ -148,7 +181,7 @@ export async function submitWave(db: Db, client: Anthropic, runId: number, c: Co
 // ---------- collecting ----------
 
 type Outcome =
-  | { kind: 'message'; message: Pick<Anthropic.Messages.Message, 'content' | 'usage' | 'stop_reason'> }
+  | { kind: 'message'; message: Pick<Anthropic.Messages.Message, 'content' | 'usage' | 'stop_reason'>; rawFile?: string }
   | { kind: 'error'; error: string; retryable: boolean };
 
 export interface CollectResult {
@@ -169,18 +202,32 @@ export async function collectRun(db: Db, client: Anthropic, runId: number, c: Co
     }
     const results = await client.messages.batches.results(batch_id);
     for await (const entry of results) {
-      const item = db.prepare(`SELECT * FROM run_items WHERE custom_id = ?`).get(entry.custom_id) as ItemRow | undefined;
-      if (!item || item.state !== 'submitted') continue;
+      const grouped = db.prepare(`SELECT * FROM run_items WHERE request_id = ? AND state = 'submitted' ORDER BY id`).all(entry.custom_id) as ItemRow[];
+      const single = grouped.length ? null : (db.prepare(`SELECT * FROM run_items WHERE custom_id = ?`).get(entry.custom_id) as ItemRow | undefined);
+      const items = grouped.length ? grouped : single && single.state === 'submitted' ? [single] : [];
+      if (!items.length) continue;
       const r = entry.result as { type: string; message?: Anthropic.Messages.Message; error?: { error?: { type?: string; message?: string } } };
-      let outcome: Outcome;
-      if (r.type === 'succeeded' && r.message) outcome = { kind: 'message', message: r.message };
-      else if (r.type === 'errored') {
-        const t = r.error?.error?.type ?? 'error';
-        outcome = { kind: 'error', error: `${t}: ${r.error?.error?.message ?? ''}`, retryable: t !== 'invalid_request_error' };
-      } else outcome = { kind: 'error', error: r.type, retryable: true }; // expired or canceled
-      const res = processOutcome(db, runId, item, outcome, true, c);
-      out.processed++;
-      if (res.escalated) out.escalated++;
+      let outcomes: Outcome[];
+      if (r.type === 'succeeded' && r.message) {
+        if (grouped.length) {
+          // Raw response stored once for the whole group; every seat's check points at it.
+          const rawFile = rawPath(runId, entry.custom_id, c);
+          writeRaw(rawFile, { custom_id: entry.custom_id, tier: items[0].tier, model: modelFor(items[0].tier, c), seats: items.map((i) => i.seat_id), message: r.message });
+          outcomes = splitGroupMessage(r.message, items.length).map((m) => ({ kind: 'message', message: m, rawFile }));
+        } else outcomes = [{ kind: 'message', message: r.message }];
+      } else {
+        let o: Outcome;
+        if (r.type === 'errored') {
+          const t = r.error?.error?.type ?? 'error';
+          o = { kind: 'error', error: `${t}: ${r.error?.error?.message ?? ''}`, retryable: t !== 'invalid_request_error' };
+        } else o = { kind: 'error', error: r.type, retryable: true }; // expired or canceled
+        outcomes = items.map(() => o);
+      }
+      items.forEach((item, i) => {
+        const res = processOutcome(db, runId, item, outcomes[i], true, c);
+        out.processed++;
+        if (res.escalated) out.escalated++;
+      });
     }
   }
   refreshRunStatus(db, runId);
@@ -214,8 +261,8 @@ export function processOutcome(db: Db, runId: number, item: ItemRow, outcome: Ou
     return { checkId: null, escalated: false };
   }
 
-  const file = rawPath(runId, `${item.custom_id}-a${attempts}`, c);
-  writeRaw(file, { custom_id: item.custom_id, tier: item.tier, model: modelFor(item.tier, c), message: outcome.message });
+  const file = outcome.rawFile ?? rawPath(runId, `${item.custom_id}-a${attempts}`, c);
+  if (!outcome.rawFile) writeRaw(file, { custom_id: item.custom_id, tier: item.tier, model: modelFor(item.tier, c), message: outcome.message });
   const fin = finalize(seat, item.tier, outcome.message, batch, new Date(), c);
   db.prepare(`UPDATE runs SET actual_cost_usd = actual_cost_usd + ? WHERE id = ?`).run(fin.cost, runId);
 

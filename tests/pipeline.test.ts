@@ -57,7 +57,7 @@ describe('planning and the tier ladder', () => {
     expect(t1.model).toBe('claude-haiku-5-5');
     expect(t1.tools.map((t: any) => t.name)).toEqual(['web_fetch']);
     expect(t1.tools[0].allowed_domains.length).toBeGreaterThan(0);
-    expect(t1.tools[0].max_content_tokens).toBe(12000);
+    expect(t1.tools[0].max_content_tokens).toBe(8000);
     expect(t1.messages[0].content).toContain('https://');
     await collectRun(db, client, runId);
     await submitWave(db, client, runId);
