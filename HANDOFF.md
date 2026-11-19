@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-11-19 (end of the session that built the app). Read this first, then `CLAUDE.md`.
+Last updated: 2026-11-19 (pilot-readiness check after the build session). Read this first, then `CLAUDE.md`.
 
 ## Where things stand
 
@@ -61,6 +61,12 @@ The working files from the session were in the Claude.ai workspace and were sent
 - **D-2 Where it runs.** Local first. Railway later if others will use it (needs Postgres or a volume for SQLite, and an auth layer; there is none yet).
 - **D-3 Power Almanac license.** Confirm what it allows for storing and exporting contact data before any hosted deployment.
 - **D-5 Model choice.** Pilot decides: Haiku accuracy versus the manual pass and its cost per seat. Switch tier 2 to Sonnet (`MODEL_T2`) or enable tier 3 if Haiku disagrees with the manual pass in ways that are its mistakes.
+
+## Pilot readiness (checked 2026-11-19)
+
+The pilot is close but blocked on two things. First, the API key: the owner saved `ANTHROPIC_API_KEY` as a variable on the **yellowbook** cloud environment, which loads only when a session starts. The session that checked this started before the key was added, so the key was absent (a test call returned `401 invalid x-api-key`). A new session on that environment should have it in its shell. Keep the key as an environment variable: api.anthropic.com bypasses the agent proxy, so a key saved as a proxy network secret would never be attached. The environment's setup script runs `npm ci` and copies `.env.example` to `.env`. That copy leaves `ANTHROPIC_API_KEY=` blank, so make sure the shell value is the one used. Second, the data: `data/` is empty apart from its README. Upload the four Power Almanac exports and `Purchasing_checked_v3.csv` at the start of each cloud session, because the container is wiped when the session ends.
+
+First steps in the next session: check that `ANTHROPIC_API_KEY` is set (a 200 from `/v1/models`), import the CSVs, run the plan step and show the seat count and cost to the owner, then run the pilot once they confirm.
 
 ## Next steps, in order
 
