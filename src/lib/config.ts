@@ -40,7 +40,7 @@ export function cfg() {
     t2MaxSearches: num('T2_MAX_SEARCHES', 2),
     t2MaxFetches: num('T2_MAX_FETCHES', 3),
     maxContentTokens: num('MAX_CONTENT_TOKENS', 12000),
-    maxOutputTokens: num('MAX_OUTPUT_TOKENS', 1500),
+    maxOutputTokens: num('MAX_OUTPUT_TOKENS', 3000),
 
     useBatch: bool('USE_BATCH', true),
     batchChunk: num('BATCH_CHUNK', 5000),

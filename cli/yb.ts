@@ -68,6 +68,7 @@ function printEstimate(db: ReturnType<typeof openDb>) {
 async function watch(db: ReturnType<typeof openDb>, runId: number) {
   const client = getClient();
   const every = Number(v.interval ?? 60) * 1000;
+  let retried = false;
   for (;;) {
     const w = await submitWave(db, client, runId);
     if (w.submitted) console.log(`submitted ${w.submitted} request(s) in ${w.batchIds.length} batch(es)`);
@@ -80,7 +81,8 @@ async function watch(db: ReturnType<typeof openDb>, runId: number) {
     const planned = (db.prepare(`SELECT COUNT(*) n FROM run_items WHERE run_id = ? AND state = 'planned'`).get(runId) as { n: number }).n;
     const submitted = open - planned;
     // Results just collected can plan the next tier: submit those at once instead of reading "nothing in flight" as a cap stop.
-    if (c.escalated > 0 && submitted === 0) continue;
+    if (submitted === 0 && planned > 0 && w.deferredForCap === 0 && !retried) { retried = true; continue; } // escalations or retries just planned
+    retried = false;
     if (submitted === 0 && w.submitted === 0 && w.deferredForCap > 0) { console.log('Nothing in flight and the cap holds the rest. Raise --cap or MAX_RUN_COST_USD and run watch again.'); break; }
     if (submitted === 0 && w.submitted === 0) { console.log(`Nothing in flight; ${planned} planned item(s) were not sent. Run watch again.`); break; }
     console.log(`waiting: ${submitted} in flight, ${planned} planned. Next check in ${every / 1000}s`);
