@@ -149,3 +149,5 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 - **The 100k price step** (see `docs/COST.md`): `MAX_CONTENT_TOKENS` 12,000 → 8,000; grouped requests get +1 fetch and +1 search.
 
 **Next:** run batches 3-12 (grouped). Run one, compare its measured cost per seat with batch 2, then continue.
+
+**Drive backup after batch 2:** `outputs/yellowbook_2026-11-19_after-batch-2.sqlite.gz` (current; restore this one), results as two Google Sheets ("after batch 2", part 1 and part 2; one CSV is now over the connector's ~3.1 MB limit), and `MANIFEST_after-batch-2.sha256`. **Raw API responses are not backed up any more:** runs 3 and 4 compress to 20 MB and 93 MB, too large for the connector, and a full run would produce about 1.5 GB. They exist only in this container (`data/raw/`). The checks table keeps the evidence that matters (source URL, evidence date, notes, flags). Owner decision pending: drop raw backups, or keep them somewhere larger (needs a storage connector that can upload files).
