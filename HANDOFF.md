@@ -114,7 +114,7 @@ Contact data stays out of git (hard rule 1); the owner's Google Drive holds it i
 
 - `source/` (`1nD71OYRHt2pna48ROu6Vgjqimn_8_58D`): the six CSVs, uploaded unconverted so re-imports are byte-identical: Purchasing, Finance, Top_Appointed, Deputy_Appointed, IT, Purchasing_checked_v3.
 - `outputs/` (`1A1WQpXHpI9rm65FeI3mYp2CkE3ZFvBRq`): `raw_runs_1-2.tar.gz` (raw API responses, runs 1 and 2) and **yellowbook results (2026-11-19)**, a Google Sheet of the full export (8,159 seats) for checking by eye.
-- **The database is not uploaded yet.** At 3.8 MB it is over the Drive connector's limit of about 3.1 MB per call. Gzipped it is 1.3 MB; waiting on the owner's go-ahead to upload it that way.
+- `outputs/` also holds `yellowbook.sqlite.gz` (the database after the pilot, gzipped to 1.3 MB because the raw 3.8 MB file is over the connector's ~3.1 MB per-call limit) and `MANIFEST.sha256`. **Restore:** download it to `data/`, check the hash, `gunzip data/yellowbook.sqlite.gz`. No need to re-import the CSVs.
 
 **End of every session:** `npm run snapshot` writes `data/snapshot/` (gzipped database, raw responses tar.gz, results CSV, sha256 manifest) and warns about any file over the limit. Upload those files to `outputs/` with the Drive connector (`create_file`, `disableConversionToGoogleType: true`, file reference `sha256:<hash>:<path>`). Raw archives will pass the limit as runs grow: split per run.
 **Start of a session:** download from Drive into `data/`, gunzip the database, and check the hashes against the manifest. Restoring through the connector is untested.
