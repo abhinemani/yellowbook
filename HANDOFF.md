@@ -76,3 +76,7 @@ The working files from the session were in the Claude.ai workspace and were sent
 - Real-export quirks found while building the importer: a stray space inside one Person ID (`...000 -50132AE`); the Purchasing file's contacts also hold other roles, so "Head of Purchasing" has 1,452 seats across the four files, not 1,132.
 - Server actions that call the API (`Check now`, `Check every seat now`, agency web lookup) block the page for the length of the call, typically under a minute per seat.
 - The Next.js build prints no warnings now; if `next build` warns about tracing the whole project, it is from a `process.cwd()` path; see the `turbopackIgnore` comments in `src/lib`.
+
+## API key in Claude Code cloud sessions (2026-11-19)
+
+Cloud sessions never received `ANTHROPIC_API_KEY` from the environment settings, even in a fresh session (tried three times). Most likely the platform withholds that name because it is Claude Code's own variable. The container also sets `ANTHROPIC_BASE_URL` for Claude Code, which the SDK would otherwise pick up. Fix: `cfg()` now reads `YELLOWBOOK_ANTHROPIC_API_KEY` first (falls back to `ANTHROPIC_API_KEY`), and the client pins `baseURL` to `https://api.anthropic.com` (override with `YELLOWBOOK_ANTHROPIC_BASE_URL`). Next step: add the key under the new name in the yellowbook environment, start a new session, and confirm with one `/v1/models` call.

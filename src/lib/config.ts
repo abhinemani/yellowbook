@@ -22,7 +22,10 @@ export function cfg() {
   const root = process.cwd();
   return {
     root,
-    apiKey: process.env.ANTHROPIC_API_KEY ?? '',
+    // YELLOWBOOK_ANTHROPIC_API_KEY wins: some hosts (Claude Code cloud sessions) withhold ANTHROPIC_API_KEY
+    // and set ANTHROPIC_BASE_URL for their own use, so we never inherit the SDK's env defaults.
+    apiKey: str('YELLOWBOOK_ANTHROPIC_API_KEY', str('ANTHROPIC_API_KEY', '')),
+    apiBaseUrl: str('YELLOWBOOK_ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
     databasePath: path.resolve(/* turbopackIgnore: true */ root, str('DATABASE_PATH', './data/yellowbook.sqlite')),
     rawDir: path.resolve(/* turbopackIgnore: true */ root, str('RAW_DIR', './data/raw')),
 
