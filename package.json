@@ -1,0 +1,44 @@
+{
+  "name": "yellowbook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "yb": "tsx cli/yb.ts",
+    "import": "tsx cli/yb.ts import",
+    "plan": "tsx cli/yb.ts plan",
+    "run": "tsx cli/yb.ts run",
+    "collect": "tsx cli/yb.ts collect",
+    "export": "tsx cli/yb.ts export"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
+    "@fontsource/open-sans": "^5.3.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "better-sqlite3": "^13.2.0",
+    "csv-parse": "^7.0.3",
+    "csv-stringify": "^6.9.0",
+    "dotenv": "^18.0.10",
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  }
+}

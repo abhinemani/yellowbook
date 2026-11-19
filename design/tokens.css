@@ -1,7 +1,7 @@
 /* yellowbook design tokens: the "Sovra look".
    Source of truth for the palette/typography is docs/DESIGN.md. */
 
-@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap");
+/* Open Sans is self-hosted via @fontsource/open-sans (imported in app/layout.tsx), so the app works offline. */
 
 :root {
   /* Palette */

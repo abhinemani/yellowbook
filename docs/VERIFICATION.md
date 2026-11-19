@@ -16,7 +16,7 @@ These rules came out of a real first pass over a Power Almanac purchasing list (
 
 ## Unresolved reasons
 
-`not_searched`, `budget_exhausted` (a tool refused because a limit was hit), `fetch_blocked` (robots/403/timeouts), `no_staff_listed` (the page loaded but names no one), `no_current_source` (searched, nothing current). The first three are retried automatically; the last two are genuine "could not find" and are retried only on a long schedule.
+`not_searched`, `budget_exhausted` (a tool refused because a limit was hit), `fetch_blocked` (robots/403/timeouts/domain not allowed), `no_staff_listed` (the page loaded but names no one), `no_current_source` (searched, nothing current), `model_error` (the model's output could not be validated after a retry; set by code only). The first three are retried automatically; the last three are genuine "could not find" or need a human look, and are left alone for `COOLDOWN_DAYS`.
 
 ## Confidence
 
@@ -34,7 +34,8 @@ An undated live page is never High, even though it is "live today". This was the
 4. A mailbox is only recorded if it was seen verbatim on a page. Pattern guesses go in notes as "Pattern guess (UNVERIFIED)". A page's visible text and its `mailto:` link can disagree; record the visible one and mention the mismatch.
 5. Label generic mailboxes (`purchasing@`, `info@`...). A generic mailbox is useful but is not the person.
 6. Phone numbers on the page can differ from the listed one. Record what the page says and note the difference.
-7. Notes are 1-2 sentences about evidence and date. Never include allegations, arrests, disputes or personal matters about anyone.
+7. Notes are 1-2 sentences about evidence and date. Never include allegations, arrests, disputes or personal matters about anyone. If a note trips the deny-list it is **redacted** to "Evidence: <url> (<date>). Notes withheld by policy filter." rather than sent back for a rewrite, because a rewrite costs another paid call.
+8. Only pages the fetch tool returned as text can prove an email (search results are encrypted; PDFs are not searchable). An email seen only in a PDF is stored as a pattern guess in notes.
 
 ## Failure modes seen in the first pass (guard against each)
 

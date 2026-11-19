@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS roles (
   power_almanac_role  TEXT UNIQUE,                         -- exact PA string, NULL for custom roles
   definition          TEXT NOT NULL,                       -- what counts as this seat (fed to the model)
   title_hints         TEXT NOT NULL DEFAULT '[]',          -- JSON array of common job titles
+  multi               INTEGER NOT NULL DEFAULT 0,          -- 1 = several holders per agency (deputies): extra seats use slot 2, 3...
   active              INTEGER NOT NULL DEFAULT 1
 );
 
@@ -77,8 +78,9 @@ CREATE TABLE IF NOT EXISTS seats (
   agency_id           INTEGER NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
   role_key            TEXT    NOT NULL REFERENCES roles(key),
   current_contact_id  INTEGER REFERENCES contacts(id),
-  last_checked_at     TEXT,
-  UNIQUE (agency_id, role_key)
+  slot                INTEGER NOT NULL DEFAULT 1,          -- >1 only for roles with multi = 1
+  last_checked_at     TEXT,                                -- last time a result was accepted (unresolved checks do not stamp it)
+  UNIQUE (agency_id, role_key, slot)
 );
 CREATE INDEX IF NOT EXISTS idx_seats_role   ON seats(role_key);
 CREATE INDEX IF NOT EXISTS idx_seats_holder ON seats(current_contact_id);
@@ -92,8 +94,28 @@ CREATE TABLE IF NOT EXISTS runs (
   batch_id     TEXT,                                       -- Message Batches id, if used
   status       TEXT NOT NULL DEFAULT 'queued'
                CHECK (status IN ('queued','running','done','failed','canceled')),
-  est_cost_usd REAL
+  est_cost_usd REAL,                                       -- estimate shown before the run started
+  spend_cap_usd REAL,                                      -- hard stop: no new wave is submitted past this
+  actual_cost_usd REAL NOT NULL DEFAULT 0,                 -- summed from stored usage, never from a model's own report
+  options_json TEXT NOT NULL DEFAULT '{}'                  -- tiers, models, escalation rules used
 );
+
+-- One planned request per (run, seat, tier). Makes runs resumable and idempotent.
+CREATE TABLE IF NOT EXISTS run_items (
+  id           INTEGER PRIMARY KEY,
+  run_id       INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  seat_id      INTEGER NOT NULL REFERENCES seats(id) ON DELETE CASCADE,
+  tier         INTEGER NOT NULL,                            -- 1 fetch-only, 2 search, 3 stronger model
+  custom_id    TEXT NOT NULL UNIQUE,                        -- sent to the Batches API
+  state        TEXT NOT NULL DEFAULT 'planned'
+               CHECK (state IN ('planned','submitted','done','error','skipped')),
+  batch_id     TEXT,
+  attempts     INTEGER NOT NULL DEFAULT 0,
+  check_id     INTEGER,
+  error        TEXT,
+  UNIQUE (run_id, seat_id, tier)
+);
+CREATE INDEX IF NOT EXISTS idx_items_run ON run_items(run_id, state);
 
 -- One verification attempt on one seat. Append-only.
 CREATE TABLE IF NOT EXISTS checks (
@@ -105,7 +127,7 @@ CREATE TABLE IF NOT EXISTS checks (
   status             TEXT NOT NULL CHECK (status IN
                        ('confirmed_in_role','replaced','role_mismatch','vacant_interim','unclear','unable_to_confirm')),
   unresolved_reason  TEXT CHECK (unresolved_reason IN
-                       ('not_searched','budget_exhausted','fetch_blocked','no_staff_listed','no_current_source') OR unresolved_reason IS NULL),
+                       ('not_searched','budget_exhausted','fetch_blocked','no_staff_listed','no_current_source','model_error') OR unresolved_reason IS NULL),
   found_name         TEXT,
   found_title        TEXT,
   found_email        TEXT,                                 -- ONLY if seen verbatim on a page
@@ -116,12 +138,16 @@ CREATE TABLE IF NOT EXISTS checks (
   confidence         TEXT CHECK (confidence IN ('High','Medium','Low')),
   notes              TEXT,
   review_state       TEXT NOT NULL DEFAULT 'pending'
-                       CHECK (review_state IN ('pending','accepted','rejected','auto_accepted')),
+                       CHECK (review_state IN ('pending','accepted','rejected','auto_accepted','not_needed')),
   model              TEXT,
   searches_used      INTEGER,
   fetches_used       INTEGER,
   input_tokens       INTEGER,
   output_tokens      INTEGER,
+  tier               INTEGER,                              -- which rung of the ladder produced this
+  cost_usd           REAL,                                 -- computed from usage, tokens + searches, batch discount applied
+  raw_path           TEXT,                                 -- data/raw/<run_id>/<custom_id>.json
+  validation_error   TEXT,
   -- guard: High needs a dated source
   CHECK (confidence <> 'High' OR evidence_date IS NOT NULL)
 );
@@ -129,11 +155,11 @@ CREATE INDEX IF NOT EXISTS idx_checks_seat ON checks(seat_id, checked_at DESC);
 
 -- Latest check per seat, with holder + agency, for the main table view.
 CREATE VIEW IF NOT EXISTS v_seat_status AS
-SELECT s.id AS seat_id, a.id AS agency_id, a.name AS agency, a.state, a.category, a.population,
+SELECT s.id AS seat_id, s.slot, s.last_checked_at, a.id AS agency_id, a.name AS agency, a.state, a.category, a.population,
        r.key AS role_key, r.label AS role,
        c.first_name || ' ' || c.last_name AS listed_name, c.title AS listed_title, c.email AS listed_email,
        k.status AS check_status, k.confidence, k.found_name, k.found_title, k.found_email,
-       k.source_url, k.review_state, k.checked_at
+       k.source_url, k.review_state, k.checked_at, k.id AS check_id, k.tier, k.unresolved_reason
 FROM seats s
 JOIN agencies a ON a.id = s.agency_id
 JOIN roles r    ON r.key = s.role_key

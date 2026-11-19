@@ -6,133 +6,221 @@
       "label": "Top Appointed Executive",
       "power_almanac_role": "Top Appointed Executive",
       "definition": "The highest appointed (non-elected) administrator of the whole government who runs day-to-day operations for the governing body, e.g. city manager, county manager, county administrator, chief administrative officer, township administrator. Not the mayor, council chair or other elected official unless the government has no appointed executive.",
-      "title_hints": ["City Manager", "County Manager", "County Administrator", "Chief Administrative Officer", "City Administrator", "Township Administrator", "Town Manager"]
+      "title_hints": [
+        "City Manager",
+        "County Manager",
+        "County Administrator",
+        "Chief Administrative Officer",
+        "City Administrator",
+        "Township Administrator",
+        "Town Manager"
+      ]
     },
     {
       "key": "deputy_top_appointed_executive",
       "label": "Deputy Top Appointed Executive",
       "power_almanac_role": "Deputy Top Appointed Executive",
       "definition": "Second-tier administrators directly under the top appointed executive. Often several per government (assistant/deputy managers). Check each listed person individually.",
-      "title_hints": ["Assistant City Manager", "Deputy City Manager", "Deputy County Administrator", "Assistant County Administrator", "Assistant County Manager", "Deputy County Manager"]
+      "title_hints": [
+        "Assistant City Manager",
+        "Deputy City Manager",
+        "Deputy County Administrator",
+        "Assistant County Administrator",
+        "Assistant County Manager",
+        "Deputy County Manager"
+      ],
+      "multi": true
     },
     {
       "key": "head_of_purchasing",
       "label": "Head of Purchasing",
       "power_almanac_role": "Head of Purchasing",
       "definition": "Leads CENTRAL purchasing/procurement for the whole government. Not a departmental buyer, procurement specialist or a single department's procurement manager. In some governments this is the finance director or an internal-services director who is the legal 'Purchasing Agent'.",
-      "title_hints": ["Purchasing Agent", "Purchasing Manager", "Purchasing Director", "Procurement Manager", "Procurement Director", "Chief Procurement Officer", "Director of Procurement"]
+      "title_hints": [
+        "Purchasing Agent",
+        "Purchasing Manager",
+        "Purchasing Director",
+        "Procurement Manager",
+        "Procurement Director",
+        "Chief Procurement Officer",
+        "Director of Procurement"
+      ]
     },
     {
       "key": "head_of_finance",
       "label": "Head of Finance",
       "power_almanac_role": "Head of Finance",
       "definition": "Leads the finance function for the whole government: finance director, CFO, or the treasurer/auditor/comptroller where that office is the top finance officer. If a government has separate elected treasurer and appointed finance director, prefer the appointed finance director and note the other.",
-      "title_hints": ["Finance Director", "Chief Financial Officer", "Treasurer", "County Auditor", "County Treasurer", "Director of Finance", "Comptroller"]
+      "title_hints": [
+        "Finance Director",
+        "Chief Financial Officer",
+        "Treasurer",
+        "County Auditor",
+        "County Treasurer",
+        "Director of Finance",
+        "Comptroller"
+      ]
     },
     {
       "key": "head_clerk",
       "label": "Head Clerk",
       "power_almanac_role": "Head Clerk",
       "definition": "The government's chief clerk: city/town/county/township clerk (records, council or board proceedings, elections where applicable).",
-      "title_hints": ["City Clerk", "County Clerk", "Town Clerk", "Township Clerk", "Clerk of the Board"]
+      "title_hints": [
+        "City Clerk",
+        "County Clerk",
+        "Town Clerk",
+        "Township Clerk",
+        "Clerk of the Board"
+      ]
     },
     {
       "key": "head_of_it",
       "label": "Head of IT",
       "power_almanac_role": "Head of IT",
       "definition": "Leads information technology for the whole government (CIO, IT director, chief technology officer).",
-      "title_hints": ["Chief Information Officer", "IT Director", "Director of Information Technology", "Chief Technology Officer"]
+      "title_hints": [
+        "Chief Information Officer",
+        "IT Director",
+        "Director of Information Technology",
+        "Chief Technology Officer"
+      ]
     },
     {
       "key": "head_of_hr",
       "label": "Head of HR",
       "power_almanac_role": "Head of HR",
       "definition": "Leads human resources / personnel for the whole government.",
-      "title_hints": ["Human Resources Director", "Director of Human Resources", "Personnel Director"]
+      "title_hints": [
+        "Human Resources Director",
+        "Director of Human Resources",
+        "Personnel Director"
+      ]
     },
     {
       "key": "head_of_communications",
       "label": "Head of Communications",
       "power_almanac_role": "Head of Communications",
       "definition": "Leads public information / communications / public affairs for the whole government.",
-      "title_hints": ["Communications Director", "Public Information Officer", "Director of Communications"]
+      "title_hints": [
+        "Communications Director",
+        "Public Information Officer",
+        "Director of Communications"
+      ]
     },
     {
       "key": "head_of_facilities_management",
       "label": "Head of Facilities Management",
       "power_almanac_role": "Head of Facilities Management",
       "definition": "Leads facilities / general services / building operations for the whole government.",
-      "title_hints": ["Facilities Director", "General Services Director", "Director of Facilities"]
+      "title_hints": [
+        "Facilities Director",
+        "General Services Director",
+        "Director of Facilities"
+      ]
     },
     {
       "key": "head_of_economic_development",
       "label": "Head of Economic Development",
       "power_almanac_role": "Head of Economic Development",
       "definition": "Leads economic development for the government.",
-      "title_hints": ["Economic Development Director", "Director of Economic Development"]
+      "title_hints": [
+        "Economic Development Director",
+        "Director of Economic Development"
+      ]
     },
     {
       "key": "head_of_public_works",
       "label": "Head of Public Works",
       "power_almanac_role": "Head of Public Works",
       "definition": "Leads public works (streets, utilities, engineering) for the government.",
-      "title_hints": ["Public Works Director", "Director of Public Works"]
+      "title_hints": [
+        "Public Works Director",
+        "Director of Public Works"
+      ]
     },
     {
       "key": "head_of_parks_and_recreation",
       "label": "Head of Parks and Recreation",
       "power_almanac_role": "Head of Parks and Recreation",
       "definition": "Leads parks and recreation for the government.",
-      "title_hints": ["Parks and Recreation Director", "Director of Parks and Recreation"]
+      "title_hints": [
+        "Parks and Recreation Director",
+        "Director of Parks and Recreation"
+      ]
     },
     {
       "key": "head_of_planning_zoning",
       "label": "Head of Planning/Zoning",
       "power_almanac_role": "Head of Planning/Zoning",
       "definition": "Leads planning and zoning / community development for the government.",
-      "title_hints": ["Planning Director", "Community Development Director", "Zoning Administrator"]
+      "title_hints": [
+        "Planning Director",
+        "Community Development Director",
+        "Zoning Administrator"
+      ]
     },
     {
       "key": "head_of_gis",
       "label": "Head of Geographic Information System",
       "power_almanac_role": "Head of Geographic Information System",
       "definition": "Leads GIS / mapping for the government.",
-      "title_hints": ["GIS Manager", "GIS Director", "GIS Coordinator"]
+      "title_hints": [
+        "GIS Manager",
+        "GIS Director",
+        "GIS Coordinator"
+      ]
     },
     {
       "key": "head_of_law_enforcement",
       "label": "Head of Law Enforcement",
       "power_almanac_role": "Head of Law Enforcement",
       "definition": "Leads law enforcement (police chief or sheriff).",
-      "title_hints": ["Police Chief", "Chief of Police", "Sheriff"]
+      "title_hints": [
+        "Police Chief",
+        "Chief of Police",
+        "Sheriff"
+      ]
     },
     {
       "key": "head_of_fire_protection",
       "label": "Head of Fire Protection Services",
       "power_almanac_role": "Head of Fire Protection Services",
       "definition": "Leads fire protection services (fire chief).",
-      "title_hints": ["Fire Chief"]
+      "title_hints": [
+        "Fire Chief"
+      ]
     },
     {
       "key": "head_of_health_services",
       "label": "Head of Health Services",
       "power_almanac_role": "Head of Health Services",
       "definition": "Leads public health / health services for the government.",
-      "title_hints": ["Health Director", "Public Health Director"]
+      "title_hints": [
+        "Health Director",
+        "Public Health Director"
+      ]
     },
     {
       "key": "head_of_water_supply",
       "label": "Head of Water Supply",
       "power_almanac_role": "Head of Water Supply",
       "definition": "Leads water supply / utilities for the government.",
-      "title_hints": ["Water Utilities Director", "Water Department Director"]
+      "title_hints": [
+        "Water Utilities Director",
+        "Water Department Director"
+      ]
     },
     {
       "key": "head_of_buildings",
       "label": "Head of Buildings",
       "power_almanac_role": "Head of Buildings",
       "definition": "Leads building department / inspections / permits for the government.",
-      "title_hints": ["Building Official", "Building Director", "Chief Building Official"]
+      "title_hints": [
+        "Building Official",
+        "Building Director",
+        "Chief Building Official"
+      ]
     }
   ]
 }

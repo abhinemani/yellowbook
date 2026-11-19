@@ -6,10 +6,11 @@ The SQL is in `db/schema.sql` (tested on SQLite). This page explains the model a
 
 - **Agency**: a county, municipality, township or other government. Added from an import or by hand.
 - **Role**: a type of position (Head of Purchasing, Head of Finance...). Roles are rows in the `roles` table, seeded from `config/roles.json`. Anyone can add a custom role.
-- **Seat**: one role at one agency. `UNIQUE(agency_id, role_key)`. A seat may have no holder yet.
+- **Seat**: one role at one agency. `UNIQUE(agency_id, role_key, slot)`. A seat may have no holder yet. Roles marked `multi` (Deputy Top Appointed Executive) can have several seats per agency, numbered by `slot` (1, 2, 3...); every other role has one seat. (Decision D-6, resolved: numbered seats.)
 - **Contact**: a person record. One contact can hold several seats (the Power Almanac `Role` column is multi-valued, for example "Top Appointed Executive,Head of Facilities Management").
 - **Check**: one verification attempt on a seat. Append-only. The latest check per seat drives the table view (`v_seat_status`).
-- **Run**: a batch of checks started together, with scope, model and estimated cost.
+- **Run**: a batch of checks started together, with scope, model, estimated cost, a spend cap and actual cost. Each (run, seat, tier) is a `run_items` row, which makes runs resumable and idempotent.
+- **Tier**: which rung of the cost ladder produced a check (1 site read, 2 plus search, 3 stronger model). Stored on every check with its dollar cost, token counts and the path of the raw API response.
 
 ## Replacement flow
 
@@ -51,6 +52,8 @@ A `role_mismatch` finding means the listed person never held the seat (for examp
 - Values like `SAME ` have trailing spaces. Trim all strings.
 - The same person (same Person ID) can appear in more than one export. Upsert on Person ID + agency; merge roles.
 - The same email can appear on several rows (shared or generic mailboxes; the deputy file had 31 repeats). Duplicate email is not a duplicate person. Dedupe on Person ID, not email.
+- One real row has a stray space inside the Person ID (`205203000100000 -50132AE`). Strip all whitespace from Person IDs before parsing.
+- Contacts in one file often hold other roles too: the Purchasing file's 1,132 contacts fill 1,452 Head of Purchasing seats across all four files.
 - Dates are `d-MMM-yy`.
 - Governments are not unique by name alone ("Washington County" exists in many states). Agency identity is `power_almanac_account_id`, or (name, state) for hand-added agencies.
 - The listed contact for a role is sometimes a departmental person, not the head of the function. That is a `role_mismatch` finding, not an import error.

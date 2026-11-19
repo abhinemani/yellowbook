@@ -27,16 +27,34 @@ yellowbook verifies and maintains government contacts. Agencies have seats (role
 
 ## Conventions
 
-- Stack is proposed in `docs/ARCHITECTURE.md` (TypeScript, Next.js, SQLite). Confirm decision D-1 in `HANDOFF.md` before scaffolding.
+- Stack: TypeScript, Node 22, Next.js App Router, SQLite (`better-sqlite3`), Anthropic TS SDK (decision D-1, confirmed). Code lives in `src/lib` (logic, no framework imports), `app/` (screens, server actions), `cli/yb.ts`.
+- Cost is a feature. Read `docs/COST.md` before changing tiers, models, tool limits or batch behavior, and keep the estimator (`src/lib/estimate.ts`) in step with any change.
 - Validate every model response against `schemas/check_result.schema.json`; on failure retry once, then store as `unable_to_confirm` with the validation error in notes.
 - Keep prompts in `prompts/` as templates; do not inline long prompts in code.
 - Store every raw API response under `data/raw/<run_id>/` for audit.
 - UI follows `docs/DESIGN.md`: navy dominant, Open Sans (Light for headlines and big numbers), line icons in colored circles, no stock imagery, short plain titles, status shown by text label as well as color.
+- All model output enters the database through `processOutcome` in `src/lib/runs.ts`, after `applyRules` in `src/lib/rules.ts`. Do not add another path.
+- Pin tool versions in `src/lib/verifier.ts` (`web_search_20250305`, `web_fetch_20250910`, always `allowed_callers: ['direct']`). The newer dynamic-filtering versions hide page text from the response, which would break the email-on-page check.
 - Write tests with invented data. Test the enforcement rules (email-on-page check, confidence downgrade, replaced-without-name downgrade) first; they are the product's integrity.
 
 ## Commands
 
-None yet. When code exists, list install, dev, test, import, verify and export commands here.
+```bash
+npm install
+npm run dev                      # UI on :3000
+npm test                         # vitest (63 tests; no network, no API key needed)
+npm run typecheck
+npm run build
+npm run import -- <csv...>       # Power Almanac export(s); idempotent
+npm run plan -- [scope]          # seats + estimated cost; sends nothing
+npm run run -- [scope] --yes     # batch run (half price); add --sync for immediate full-price
+npm run yb -- watch <runId>      # poll batches, process results, submit the next tier
+npm run yb -- status [runId]
+npm run export -- out.csv [--roles a,b]
+npm run yb -- compare <earlier_checked.csv>   # benchmark against the manual pass
+```
+
+Scope flags: `--roles --states --category --min-pop --max-pop --limit --kind verify|discover --max-tier 1|2|3 --cap USD --include-fresh --ignore-cooldown`.
 
 ## Before you stop
 

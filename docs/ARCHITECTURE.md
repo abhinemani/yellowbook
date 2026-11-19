@@ -1,6 +1,6 @@
 # Architecture
 
-Status: proposed design. Nothing here is built yet. Decisions that still need the owner are listed in `HANDOFF.md`.
+Status: built (TypeScript, Next.js, SQLite) and tested against faked API responses; not yet run against the live API. Open decisions are in `HANDOFF.md`. Cost design is in `docs/COST.md`.
 
 ## What the app does
 
@@ -40,23 +40,28 @@ CSV import ──► agencies / contacts / seats ◄── manual add / web look
 
 | Rule | Enforcement |
 |---|---|
-| An email is only recorded if it was seen on a page | After the call, check that `found_email` appears verbatim in the text of a fetched page or search result in the response. If not, move it to `notes` as "Pattern guess (UNVERIFIED)" and null the field. |
-| "High" confidence needs a dated 2025-or-later official source | Database CHECK (`confidence <> 'High' OR evidence_date IS NOT NULL`); validator also downgrades High to Medium if `evidence_date` is older than 2025-01-01 or the host is not the agency's own domain. |
+| An email is only recorded if it was seen on a page | After the call, check that `found_email` appears verbatim in the text of a page the fetch tool returned, or in a citation excerpt. (Search results are encrypted and cannot be checked; PDFs arrive as base64 and are not searched.) If not, move it to `notes` as "Pattern guess (UNVERIFIED)" and null the field. |
+| "High" confidence needs a dated 2025-or-later official source | Database CHECK (`confidence <> 'High' OR evidence_date IS NOT NULL`); validator also downgrades High to Medium if `evidence_date` is older than 2025-01-01, is in the future, or the source host is not the agency's own domain (or an agenda platform whose subdomain names the agency). |
 | "Not searched" is different from "not found" | `unresolved_reason` is required for `unable_to_confirm` and `unclear`. A tool refusal sets `budget_exhausted` or `fetch_blocked`, which is eligible for automatic retry. A page that loads but names no staff is `no_staff_listed`. |
 | Replacements must name someone | `replaced` with no `found_name` is downgraded to `vacant_interim` or `unclear`. |
 | No personal matters in notes | Validator rejects notes that match a small deny-list (arrest, charged, lawsuit, divorce, and similar) and asks for a rewrite. |
 | Generic mailboxes are labeled | `found_email_is_generic` is set by pattern (purchasing@, procurement@, info@, contact@, finance@...) as well as by the model. |
+| An answer needs evidence | A confident result with no fetch or search behind it is discarded as `unable_to_confirm / not_searched`. A cited `source_url` the model never retrieved is dropped and confidence capped at Low. |
+| Tool failures are not "not found" | If every tool call errored, the reason is rewritten to `fetch_blocked` or `budget_exhausted` whatever the model said. |
+| Subordinates are not the head | A found title with assistant, associate, specialist, buyer and similar (or deputy, outside the deputy role) turns `replaced` into `unclear` and a confirmed holder into `role_mismatch`, at Low confidence. |
+| A confirmation must match the listed person | A different last name turns `confirmed_in_role` into `unclear`. |
 
 ## Claude API usage
 
-Confirm every detail below against the current docs at build time; tool versions and limits change.
+Details confirmed against the current docs in Nov 2026; re-check when upgrading, because tool versions and prices change.
 
-- **Tools:** the server-side web search tool and web fetch tool. The docs currently list `web_search_20260209` and `web_fetch_20260209`; these require the code execution tool (`code_execution_20260120` or later) for dynamic filtering, and the API provisions it automatically. Set `allowed_callers: ["direct"]` to call search directly without dynamic filtering.
-- **Pricing (as documented in Nov 2026):** web search is $10 per 1,000 searches plus token costs for the results; web fetch has no extra charge beyond tokens; search results count as input tokens.
-- **Bulk runs:** web search and web fetch both work in the Message Batches API at the same prices. Batches throttle web search per organization, so a large batch may take longer. The org's web-search rate limit is shown on the Rate limits page in the Console.
-- **Interactive runs** (verify one seat now, add an agency): plain Messages API, streaming.
-- **Model:** set by `CLAUDE_MODEL` in `.env`. Start with a Sonnet-class model; compare against Haiku-class on a 25-seat pilot before running bulk.
-- **Cost estimate to sanity-check on a pilot:** about 2 searches per seat is roughly $20 per 1,000 seats in search fees alone, so about $23 for the 1,132-contact purchasing list and about $108 for all 5,413 contacts, plus token costs (not yet measured). Measure real tokens per seat on the pilot and record it in `HANDOFF.md`.
+- **The cost ladder.** Tier 1: cheap model, `web_fetch` only, restricted to the agency's domain, starting from URLs placed in the prompt (the fetch tool can only open URLs that appear in the conversation). Tier 2: `web_search` plus `web_fetch`, for seats tier 1 could not settle. Tier 3: optional stronger model. See `docs/COST.md`.
+- **Tool versions are pinned** to `web_search_20250305` and `web_fetch_20250910` with `allowed_callers: ["direct"]`. The newer dynamic-filtering versions run the tool through code and keep page text out of the response; the app needs that text for the email-on-page check.
+- **Limits per request:** `max_uses` on both tools, `max_content_tokens` on fetch (does not apply to PDFs), `max_tokens` on output, aggregator domains blocked.
+- **Bulk runs:** Message Batches API (50% off tokens; web search and fetch both work in batches at normal prices; batch search is throttled per organization). Each wave is chunked (`BATCH_CHUNK`), and a wave is only sent if the run's spend cap allows it. Results are collected by polling and processed idempotently.
+- **Interactive runs** (check one seat now, add an agency): Messages API at full price. A `pause_turn` stop is continued a few times; in a batch it is treated as incomplete and retried once.
+- **Errors:** tool errors arrive as HTTP 200 with an error block (`max_uses_exceeded`, `url_not_allowed`, ...) and are mapped to `budget_exhausted` or `fetch_blocked`. Batch-level errors are retried up to three times; invalid model output is retried once, then stored as `model_error` and not retried automatically.
+- **Money is computed from stored usage** (`src/lib/pricing.ts`), never from a model's own report.
 
 ## Why this exists as an app and not a Claude.ai session
 

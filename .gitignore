@@ -21,3 +21,6 @@ __pycache__/
 .venv/
 *.log
 .DS_Store
+
+*.tsbuildinfo
+next-env.d.ts

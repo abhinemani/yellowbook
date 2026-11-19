@@ -1,12 +1,13 @@
 # HANDOFF
 
-Last updated: 2026-11-19 (end of the Claude.ai session that designed this repo). Read this first, then `CLAUDE.md`.
+Last updated: 2026-11-19 (end of the session that built the app). Read this first, then `CLAUDE.md`.
 
 ## Where things stand
 
-- **Repo contains design and specs only.** No application code yet: schema, roles, prompts, result contract, rules, design tokens, docs.
-- **The schema, role seed and result contract were tested** (schema loads in SQLite, 19 roles seed with unique keys, the "High needs a dated source" guard rejects bad rows, status enum rejects bad values).
-- **A manual first pass proved the approach and exposed its limits** (below). The app exists to remove those limits.
+- **The app is built** and runs: import Power Almanac CSVs, plan and run checks (batch or immediate), review queue with accept/reject, agency search and add (database first, then a web lookup), per-seat "Check now", roles registry, CSV export, CLI. TypeScript, Next.js, SQLite (decision D-1, confirmed by the owner).
+- **It has not been run against the live API.** The build session had no network and no API key. Everything is tested against faked API responses shaped like the documented ones (63 tests, `npm test`), and every screen was loaded against the four real exports (1,808 agencies, 5,412 contacts, 6,360 seats). The first live run will find whatever the fakes missed. Expect small fixes to response parsing.
+- **Cost is designed in** (`docs/COST.md`): cheap model reading the agency's own site first, paid web search only for seats that fail, Batch API for bulk, spend cap, estimate shown before any run. The dollar figures are arithmetic on assumptions until the pilot replaces them.
+- **Integrity rules are enforced in code** (`src/lib/rules.ts`) and tested first: email must appear on a fetched page, High needs a dated official source, replaced needs a name, no evidence means not searched, subordinate titles are not the head, notes carry evidence only.
 
 ## What was done manually (the evidence for this design)
 
@@ -45,34 +46,33 @@ The working files from the session were in the Claude.ai workspace and were sent
 
 ## Decisions made
 
+- **Stack:** TypeScript, Node 22, Next.js App Router, SQLite (`better-sqlite3`), Anthropic TS SDK. Runs locally first.
 - **Private repo; contact data and CSVs never committed** (`.gitignore`, `data/README.md`).
-- **The app calls the Claude API directly** with the web search and fetch tools, using the Batches API for bulk runs.
-- **Seat model:** agency, then one seat per role, then a contact; checks are append-only; replacements supersede, never overwrite.
-- **Roles are data** (`config/roles.json`), seeded from the 18 Power Almanac role strings found in the exports, so any position can be checked and custom roles can be added.
-- **Look and feel is the Sovra style** (navy, maroon, Open Sans Light, line icons in colored circles). See `docs/DESIGN.md`.
+- **Cost ladder:** tier 1 = Haiku 5.5, fetch-only on the agency's domain; tier 2 = Haiku 5.5 plus search (2 searches); tier 3 = Sonnet 5.5, off by default. Bulk runs on the Batch API. Spend cap $25 per run by default.
+- **Tool versions pinned** to the earlier non-dynamic-filtering versions so page text stays in the response for the email check.
+- **Seat model:** agency, then one seat per role, then a contact; checks are append-only; replacements supersede, never overwrite. **Deputies (D-6, resolved):** numbered seats (`slot` 1, 2, 3...) for roles marked `multi`. The import produced up to 6 deputy seats per agency.
+- **Review policy (D-4, applied as proposed, change in `.env`):** an unchanged confirmation at High is auto-accepted (5% sampled for review anyway); everything that changes a contact, including a confirmation that brings a new verified email or phone, waits for a human. Confirmed at Medium goes to the queue with a bulk-accept button.
+- **Invalid model output:** retried once, then stored as `unable_to_confirm / model_error`; not retried automatically. A policy-filtered note is redacted, not rewritten (a rewrite costs another call).
+- **Roles are data** (`config/roles.json`), seeded from the 18 Power Almanac role strings; unknown strings in an import create a custom role and are reported.
+- **Look and feel is the Sovra style** (navy, maroon, Open Sans Light self-hosted via `@fontsource`, line icons in colored circles). See `docs/DESIGN.md`.
 
 ## Open decisions (owner input needed)
 
-- **D-1 Stack.** Proposed: TypeScript, Next.js, SQLite. Check against the owner's Agora app and prefer a match.
-- **D-2 Where it runs.** Local first is simplest. Railway later if others will use it.
-- **D-3 Power Almanac license.** Confirm what the license allows for storing and exporting contact data before any hosted deployment.
-- **D-4 Review policy.** Proposed: High-confidence confirmations auto-accept; every replacement needs a human. Confirm.
-- **D-5 Model choice.** Compare Sonnet-class and Haiku-class on the 25-seat pilot for accuracy and cost per seat.
-- **D-6 Seat-less people.** Deputy executives are many per government. Proposed: model them as several seats with a numbered suffix, or allow multiple contacts per seat for that role. Decide before importing the deputy file.
+- **D-2 Where it runs.** Local first. Railway later if others will use it (needs Postgres or a volume for SQLite, and an auth layer; there is none yet).
+- **D-3 Power Almanac license.** Confirm what it allows for storing and exporting contact data before any hosted deployment.
+- **D-5 Model choice.** Pilot decides: Haiku accuracy versus the manual pass and its cost per seat. Switch tier 2 to Sonnet (`MODEL_T2`) or enable tier 3 if Haiku disagrees with the manual pass in ways that are its mistakes.
 
 ## Next steps, in order
 
-1. Confirm D-1, scaffold the app, set up migrations from `db/schema.sql`, seed roles.
-2. Build the importer for all four files using the gotchas in `docs/DATA_MODEL.md` (BOM, padded headers, thousands separators, mangled account id, multi-valued Role, duplicate emails). Test on invented fixtures.
-3. Build the validator and its tests first: email-on-page check, High-needs-date, replaced-needs-name, generic-mailbox flag, notes deny-list.
-4. Build the verifier (Messages API, one seat) using `prompts/verify_contact.md`; run a 25-seat pilot on seats already checked by hand; record tokens and cost per seat here.
-5. Review queue UI and accept/reject flow.
-6. Agency search and "add agency" via `prompts/find_agency.md`; "discover contact" for empty seats.
-7. Bulk runs on the Batches API with cost estimate before start and resume/retry.
-8. Export with check columns. Then scheduled re-checks.
+1. **Run the 25-seat pilot.** Put the four CSVs in `data/`, set `ANTHROPIC_API_KEY`, then: `npm run import -- data/*.csv`, `npm run plan -- --roles head_of_purchasing --limit 25`, `npm run run -- --roles head_of_purchasing --limit 25 --sync --yes`. Fix anything the fakes missed (most likely: response block shapes, `pause_turn` handling, tool-version availability on the chosen model).
+2. **Record the measured cost per seat and per tier here and in `docs/COST.md`**; then `npm run yb -- compare <Purchasing_checked_v3.csv>` for the accuracy half of D-5. The v3 CSV was handed to the owner; save it in `data/`.
+3. **Run the 25 largest unresolved purchasing seats** (the batch stopped during the manual pass) as the first real bulk run.
+4. **Bulk runs** by role, largest first, within the spend cap: `npm run run -- --roles head_of_purchasing --yes`, then `npm run yb -- watch <id>`.
+5. **Not built yet:** scheduled re-checks; authentication and multi-user (needed for any hosted deployment); editing a contact by hand; an in-app background poller for batches (today: the Check for results button or `yb watch`); keyboard shortcuts in the review queue; a role-definition editor (add only).
 
 ## Gotchas
 
-- The chat workspace could not reach most sites or the API; run the app on the owner's machine.
-- Web search pricing and tool versions change; re-check the docs when building (`docs/ARCHITECTURE.md` lists what to confirm).
-- Contact data is about real people. Keep it out of git, logs, tests and issues.
+- Contact data is about real people. Keep it out of git, logs, tests and issues. Tests use invented data ("Example County").
+- Real-export quirks found while building the importer: a stray space inside one Person ID (`...000 -50132AE`); the Purchasing file's contacts also hold other roles, so "Head of Purchasing" has 1,452 seats across the four files, not 1,132.
+- Server actions that call the API (`Check now`, `Check every seat now`, agency web lookup) block the page for the length of the call, typically under a minute per seat.
+- The Next.js build prints no warnings now; if `next build` warns about tracing the whole project, it is from a `process.cwd()` path; see the `turbopackIgnore` comments in `src/lib`.
