@@ -16,6 +16,8 @@ node -e "const D=require('better-sqlite3');const d=new D('data/yellowbook.sqlite
 gzip -9 -c data/yellowbook.sqlite > "$out/yellowbook.sqlite.gz"
 # Raw API responses are not backed up (owner decision, 2026-11-19).
 npx tsx cli/yb.ts export "$out/yellowbook_results_$day.csv" >/dev/null
+# The list the owner uses: only contacts whose email is verified or probably fine.
+npx tsx cli/yb.ts export "$out/yellowbook_usable_$day.csv" --usable >/dev/null
 
 (cd "$out" && sha256sum * > MANIFEST.sha256)
 limit=$((3100 * 1024))

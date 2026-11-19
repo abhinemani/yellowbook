@@ -151,3 +151,10 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 **Next:** run batches 3-12 (grouped). Run one, compare its measured cost per seat with batch 2, then continue.
 
 **Drive backup after batch 2:** `outputs/yellowbook_2026-11-19_after-batch-2.sqlite.gz` (current; restore this one), results as two Google Sheets ("after batch 2", part 1 and part 2; one CSV is now over the connector's ~3.1 MB limit), and `MANIFEST_after-batch-2.sha256`. **Raw API responses are not backed up any more:** runs 3 and 4 compress to 20 MB and 93 MB, too large for the connector, and a full run would produce about 1.5 GB. They exist only in this container (`data/raw/`). The checks table keeps the evidence that matters (source URL, evidence date, notes, flags). Owner decision pending: drop raw backups, or keep them somewhere larger (needs a storage connector that can upload files).
+
+## Usable contacts only; raw data dropped (owner decision, 2026-11-19)
+
+- The owner uses only contacts whose email is **Verified** (seen verbatim on an official page in the latest check) or **Probably fine** (person confirmed still in the seat, earlier address kept, domain receives mail). Both need a settled status at Medium or High. `npm run export -- out.csv --usable` writes just those, with "Email Quality" and "Office Mailbox" columns (`emailQuality` in `src/lib/export.ts`, tested). After batches 1-2 plus the pilot: 343 usable contacts (193 Verified, 150 Probably fine).
+- The database is kept whole (history, and the record that stops paid re-checks); only the export and the Drive copy are filtered. `npm run snapshot` writes both exports.
+- **Raw API responses are gone and no longer saved** (`STORE_RAW=false` by default; `CLAUDE.md` convention updated). About 300 MB deleted locally, `checks.raw_path` cleared, and the one raw archive on Drive moved to the Drive trash.
+- Drive `outputs/` now: **yellowbook usable contacts (2026-11-19)** (the owner's list) and `yellowbook_2026-11-19_current.sqlite.gz` (restore this one). Older copies are kept with their dates.
