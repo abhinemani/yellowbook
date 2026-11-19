@@ -168,3 +168,11 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 - 138 of 500 grouped requests still crossed Haiku's 100k price step. Room to tune (fewer fetches per group, or 6k pages), but already 3x cheaper.
 - Drive: **yellowbook usable contacts (after batch 3)** and `yellowbook_2026-11-19_after-batch-3.sqlite.gz` (restore this one). The database is 2.2 MB compressed; it will pass the connector's ~3.1 MB limit within a few batches, so split it or find larger storage before then.
 - **Remaining:** about 6,300 seats below population 300k. At 0.8 cents a seat, roughly $50 for all of them.
+
+## Batch 4 (run 6, 2026-11-19)
+
+- Scope: all roles, population 100k to 300k, cap raised to $30 by the owner for this run (default stays $25). 2,463 seats in 620 grouped requests. **$21.63, 0.9 cents a seat.**
+- Final per seat: 1,045 confirmed, 565 replaced, 154 role mismatch, 57 vacant or interim, 374 unclear, 268 unable. 9 seats errored on the over-1M-token document problem (about 2 requests).
+- **Usable contacts now 2,010** (728 Verified, 1,282 Probably fine; 249 office mailboxes).
+- The gzipped database passed the connector limit (3.2 MB), so backups are now xz (1.9 MB): `outputs/yellowbook_2026-11-19_after-batch-4.sqlite.xz` (restore this one: download, `xz -d`). `npm run snapshot` now writes xz and only the usable export. Usable list: **yellowbook usable contacts (after batch 4)**.
+- **Remaining:** seats under population 100k (about 3,800).
