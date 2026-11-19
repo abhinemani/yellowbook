@@ -17,7 +17,8 @@
     "plan": "tsx cli/yb.ts plan",
     "run": "tsx cli/yb.ts run",
     "collect": "tsx cli/yb.ts collect",
-    "export": "tsx cli/yb.ts export"
+    "export": "tsx cli/yb.ts export",
+    "snapshot": "bash cli/snapshot.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.10.0",

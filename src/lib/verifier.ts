@@ -99,8 +99,30 @@ export function buildParams(seat: SeatContext, tier: Tier, kind: RunKind, today:
     max_tokens: c.maxOutputTokens,
     system: loadPrompt('system'),
     tools,
+    output_config: { format: { type: 'json_schema', schema: outputSchema() } },
     messages: [{ role: 'user', content: user }],
   };
+}
+
+let apiSchema: Record<string, unknown> | null = null;
+/**
+ * The result contract in the dialect the API's structured outputs accept, so the response is
+ * constrained to it (the prompt names the schema but the model cannot read the file).
+ * The API rejects `enum` alongside a type list such as ["string", "null"], so a nullable enum
+ * becomes anyOf [string enum, null]. Ajv still validates against the file itself.
+ */
+export function outputSchema(): Record<string, unknown> {
+  if (apiSchema) return apiSchema;
+  const s = JSON.parse(fs.readFileSync(path.resolve(/* turbopackIgnore: true */ cfg().root, 'schemas/check_result.schema.json'), 'utf8'));
+  const properties: Record<string, unknown> = {};
+  for (const [k, p] of Object.entries(s.properties as Record<string, { type?: unknown; enum?: unknown[]; [x: string]: unknown }>)) {
+    if (Array.isArray(p.enum) && Array.isArray(p.type) && p.type.includes('null')) {
+      const { type: _t, enum: values, ...rest } = p;
+      properties[k] = { ...rest, anyOf: [{ type: 'string', enum: values.filter((v) => v !== null) }, { type: 'null' }] };
+    } else properties[k] = p;
+  }
+  apiSchema = { type: 'object', additionalProperties: false, required: s.required, properties };
+  return apiSchema;
 }
 
 // ---------- reading a response ----------

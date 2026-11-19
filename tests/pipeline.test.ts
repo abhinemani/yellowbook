@@ -323,4 +323,17 @@ describe('adding agencies and seats by hand', () => {
     expect(text).not.toMatch(/\{\{/);
     expect(p.tools!.map((t: any) => t.name)).toEqual(['web_search', 'web_fetch']);
   });
+
+  it('every check request carries the result schema as a structured output, in the dialect the API accepts', () => {
+    const db = fixtureDb();
+    const id = addAgency(db, { name: 'Schema Township', category: 'township', state: 'OH', county: 'Lake', population: 900, website: 'schema.example.gov', main_phone: null, street_address: null, city: null, zip: null, source_url: null }, 'manual', ['head_of_finance']);
+    const seat = getSeatContext(db, (db.prepare('SELECT id FROM seats WHERE agency_id = ?').get(id) as any).id)!;
+    for (const tier of [1, 2] as const) {
+      const schema = (buildParams(seat, tier, 'verify', new Date('2026-11-19')) as any).output_config.format.schema;
+      expect(schema.additionalProperties).toBe(false);
+      expect(schema.required).toContain('found_name');
+      for (const prop of Object.values(schema.properties) as any[]) expect(prop.enum && Array.isArray(prop.type)).toBeFalsy();
+      expect(schema.properties.confidence.anyOf).toEqual([{ type: 'string', enum: ['High', 'Medium', 'Low'] }, { type: 'null' }]);
+    }
+  });
 });
