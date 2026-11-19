@@ -176,3 +176,12 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 - **Usable contacts now 2,010** (728 Verified, 1,282 Probably fine; 249 office mailboxes).
 - The gzipped database passed the connector limit (3.2 MB), so backups are now xz (1.9 MB): `outputs/yellowbook_2026-11-19_after-batch-4.sqlite.xz` (restore this one: download, `xz -d`). `npm run snapshot` now writes xz and only the usable export. Usable list: **yellowbook usable contacts (after batch 4)**.
 - **Remaining:** seats under population 100k (about 3,800).
+
+## Final batch (run 7) and where everything stands (2026-11-19)
+
+- Run 7: all roles under population 100k, cap $40 (owner decision for this run; default stays $25). 3,865 seats in 927 grouped requests (plus 9 starting at tier 2). **$32.40, 0.8 cents a seat**, no errors. Final per seat: 1,565 confirmed, 820 replaced, 286 role mismatch, 73 vacant or interim, 546 unclear, 575 unable.
+- **Every one of the 8,159 imported seats has been checked once.** The 587 seats with no check are extra holders added by findings (585) or by the owner (2).
+- **Total API spend, all runs: $83.52** (first estimate for everything was about $150).
+- **Usable contacts: 3,871 of 8,159 seats (47%)**: 1,592 Verified, 2,279 Probably fine; 475 are office mailboxes. By role: Finance 890, Top Appointed 830, IT 717, Deputy 702, Purchasing 600, Clerk 62, others fewer.
+- Drive `outputs/`: **yellowbook usable contacts FINAL** (part 1 of 2, larger governments; part 2 of 2, smaller), and `yellowbook_2026-11-19_final.sqlite.xz` (restore this one: download, `xz -d`). The xz database is 2.8 MB, close to the connector's ~3.1 MB limit: the next backup needs a split (`split -b 2M`, restore with `cat`) or larger storage.
+- **Open:** merge the working branch (everything since PR #4); 14 seats errored on over-1M-token documents in runs 5-6 (not retried); seats still "unable" or "unclear" can be retried after `COOLDOWN_DAYS` (30); scheduled re-checks are not built.
