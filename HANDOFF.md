@@ -106,4 +106,15 @@ Cloud sessions never received `ANTHROPIC_API_KEY` from the environment settings,
 2. **Decide on tier 1.** It escalated 80% on the largest governments, which have big sites. Options: start large agencies at tier 2, raise the tier-1 fetch budget, or keep it and see whether smaller governments settle at tier 1 more often (likely: smaller sites).
 3. **Set the cap and run in batch:** the 25 unresolved seats from the manual pass, then purchasing by size. Expect about $0.02 a seat in batch at current rates; raise `--cap` or split by `--min-pop` to stay under $25 per run.
 4. Update `docs/COST.md` and the estimator defaults once 50+ tier-1 checks exist (the rate becomes measured automatically).
-5. `data/` is not in git: a new session must re-upload the six CSVs, re-import, and the pilot's checks will be gone (the SQLite file lives in the container).
+5. `data/` is not in git. Data now lives on the owner's Google Drive (next section); a new session restores from there.
+
+## Data on Google Drive (2026-11-19)
+
+Contact data stays out of git (hard rule 1); the owner's Google Drive holds it instead, in a private folder **yellowbook data** (folder id `1neacle29VjHHgHCkltHlRPM0qDaHZ2Q0`):
+
+- `source/` (`1nD71OYRHt2pna48ROu6Vgjqimn_8_58D`): the six CSVs, uploaded unconverted so re-imports are byte-identical: Purchasing, Finance, Top_Appointed, Deputy_Appointed, IT, Purchasing_checked_v3.
+- `outputs/` (`1A1WQpXHpI9rm65FeI3mYp2CkE3ZFvBRq`): `raw_runs_1-2.tar.gz` (raw API responses, runs 1 and 2) and **yellowbook results (2026-11-19)**, a Google Sheet of the full export (8,159 seats) for checking by eye.
+- **The database is not uploaded yet.** At 3.8 MB it is over the Drive connector's limit of about 3.1 MB per call. Gzipped it is 1.3 MB; waiting on the owner's go-ahead to upload it that way.
+
+**End of every session:** `npm run snapshot` writes `data/snapshot/` (gzipped database, raw responses tar.gz, results CSV, sha256 manifest) and warns about any file over the limit. Upload those files to `outputs/` with the Drive connector (`create_file`, `disableConversionToGoogleType: true`, file reference `sha256:<hash>:<path>`). Raw archives will pass the limit as runs grow: split per run.
+**Start of a session:** download from Drive into `data/`, gunzip the database, and check the hashes against the manifest. Restoring through the connector is untested.
