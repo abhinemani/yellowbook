@@ -280,7 +280,7 @@ describe('export', () => {
     const csv = exportCsv(db, { roles: ['head_of_purchasing'] });
     const [header, ...lines] = csv.trim().split('\n');
     expect(header.startsWith('Email Address,First Name,Last Name,Title,Government Designated Name,Person ID')).toBe(true);
-    expect(header.endsWith('Check Status,Current Name,Current Title,Current Email,Current Phone,Source URL,Confidence,Check Notes,Review State,Checked At,Email Domain Status')).toBe(true);
+    expect(header.endsWith('Check Status,Current Name,Current Title,Current Email,Current Phone,Source URL,Confidence,Check Notes,Review State,Checked At,Email Domain Status,Email Quality,Office Mailbox')).toBe(true);
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain('Not checked');
   });

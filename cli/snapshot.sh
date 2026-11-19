@@ -14,7 +14,7 @@ rm -f "$out"/*
 # Fold the WAL into the main file so the copy is complete.
 node -e "const D=require('better-sqlite3');const d=new D('data/yellowbook.sqlite');d.pragma('wal_checkpoint(TRUNCATE)');d.close()"
 gzip -9 -c data/yellowbook.sqlite > "$out/yellowbook.sqlite.gz"
-if [ -d data/raw ]; then tar -czf "$out/raw_$day.tar.gz" -C data raw; fi
+# Raw API responses are not backed up (owner decision, 2026-11-19).
 npx tsx cli/yb.ts export "$out/yellowbook_results_$day.csv" >/dev/null
 
 (cd "$out" && sha256sum * > MANIFEST.sha256)

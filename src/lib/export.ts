@@ -16,7 +16,7 @@ export const PA_COLUMNS = [
   'Government Main Phone Number', 'Government Street Address', 'Government City', 'Government State', 'Government Zip Code',
   'Population', 'Last Verified Date', 'Fiscal Year End', 'Update Status',
 ] as const;
-export const CHECK_COLUMNS = ['Check Status', 'Current Name', 'Current Title', 'Current Email', 'Current Phone', 'Source URL', 'Confidence', 'Check Notes', 'Review State', 'Checked At', 'Email Domain Status'] as const;
+export const CHECK_COLUMNS = ['Check Status', 'Current Name', 'Current Title', 'Current Email', 'Current Phone', 'Source URL', 'Confidence', 'Check Notes', 'Review State', 'Checked At', 'Email Domain Status', 'Email Quality', 'Office Mailbox'] as const;
 
 const STATUS_LABEL: Record<string, string> = {
   confirmed_in_role: 'Confirmed in role',
@@ -28,7 +28,25 @@ const STATUS_LABEL: Record<string, string> = {
 };
 export const statusLabel = (s: string | null | undefined): string => (s ? STATUS_LABEL[s] ?? s : 'Not checked');
 
-export function exportCsv(db: Db, opts: { roles?: string[]; states?: string[] } = {}): string {
+const SETTLED = new Set(['confirmed_in_role', 'replaced', 'role_mismatch', 'vacant_interim']);
+
+/**
+ * Can the owner use this seat's email? Only when the seat's latest check settled who holds it at Medium or High
+ * confidence, the holder has an email, and its domain still receives mail.
+ *  'Verified'      the address was seen verbatim on an official page in the latest check
+ *  'Probably fine' the person was confirmed still in the seat; their earlier address was kept but not re-seen
+ * Anything else is not usable (null).
+ */
+export function emailQuality(r: Record<string, unknown>, domain: string | null): 'Verified' | 'Probably fine' | null {
+  if (!SETTLED.has(String(r.k_status)) || (r.confidence !== 'High' && r.confidence !== 'Medium')) return null;
+  if (!r.email) return null;
+  if (domain && domain !== 'mx' && domain !== 'a_only') return null;
+  if (r.found_email) return 'Verified';
+  return r.k_status === 'confirmed_in_role' ? 'Probably fine' : null;
+}
+
+/** Power Almanac columns, then check columns. `usable` keeps only seats whose email the owner can use (emailQuality). */
+export function exportCsv(db: Db, opts: { roles?: string[]; states?: string[]; usable?: boolean } = {}): string {
   const where: string[] = [];
   const args: unknown[] = [];
   if (opts.roles?.length) { where.push(`s.role_key IN (${opts.roles.map(() => '?').join(',')})`); args.push(...opts.roles); }
@@ -36,7 +54,7 @@ export function exportCsv(db: Db, opts: { roles?: string[]; states?: string[] } 
   const rows = db
     .prepare(
       `SELECT a.*, r.label AS role_label, COALESCE(r.power_almanac_role, r.label) AS pa_role, s.slot,
-              c.first_name, c.last_name, c.title, c.email, c.phone, c.phone_ext, c.street_address AS c_street, c.suite, c.city AS c_city,
+              c.first_name, c.last_name, c.title, c.email, c.email_is_generic, c.phone, c.phone_ext, c.street_address AS c_street, c.suite, c.city AS c_city,
               c.state AS c_state, c.zip AS c_zip, c.power_almanac_person_id, c.source_last_verified,
               k.status AS k_status, k.found_name, k.found_title, k.found_email, k.found_phone, k.source_url, k.confidence, k.notes, k.review_state, k.checked_at
        FROM seats s JOIN agencies a ON a.id = s.agency_id JOIN roles r ON r.key = s.role_key
@@ -47,7 +65,8 @@ export function exportCsv(db: Db, opts: { roles?: string[]; states?: string[] } 
     )
     .all(...args) as Record<string, unknown>[];
 
-  const records = rows.map((r) => ({
+  const kept = opts.usable ? rows.filter((r) => emailQuality(r, emailDomainStatus(db, r.email as string | null)) !== null) : rows;
+  const records = kept.map((r) => ({
     'Email Address': r.email, 'First Name': r.first_name, 'Last Name': r.last_name, Title: r.title,
     'Government Designated Name': r.name, 'Person ID': r.power_almanac_person_id, 'Power Almanac Account ID': r.power_almanac_account_id,
     Role: r.pa_role, 'Phone Number': r.phone, 'Phone Number Ext': r.phone_ext, 'Street Address or PO Box Number': r.c_street,
@@ -60,6 +79,8 @@ export function exportCsv(db: Db, opts: { roles?: string[]; states?: string[] } 
     'Current Email': r.found_email, 'Current Phone': r.found_phone, 'Source URL': r.source_url, Confidence: r.confidence,
     'Check Notes': r.notes, 'Review State': r.review_state, 'Checked At': r.checked_at,
     'Email Domain Status': domainLabel(db, r.email as string | null),
+    'Email Quality': emailQuality(r, emailDomainStatus(db, r.email as string | null)) ?? '',
+    'Office Mailbox': r.email ? (r.email_is_generic ? 'Yes' : 'No') : '',
   }));
   return stringify(records, { header: true, columns: [...PA_COLUMNS, ...CHECK_COLUMNS] });
 }

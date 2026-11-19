@@ -27,6 +27,8 @@ export function cfg() {
     apiKey: str('YELLOWBOOK_ANTHROPIC_API_KEY', str('ANTHROPIC_API_KEY', '')),
     apiBaseUrl: str('YELLOWBOOK_ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
     databasePath: path.resolve(/* turbopackIgnore: true */ root, str('DATABASE_PATH', './data/yellowbook.sqlite')),
+    /** Owner decision (2026-11-19): raw API responses are not kept by default. STORE_RAW=true keeps them under RAW_DIR. */
+    storeRaw: bool('STORE_RAW', false),
     rawDir: path.resolve(/* turbopackIgnore: true */ root, str('RAW_DIR', './data/raw')),
 
     // The cost ladder. Tier 1 reads the agency's own site with a cheap model and no paid search.

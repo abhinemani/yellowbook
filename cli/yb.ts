@@ -22,7 +22,7 @@ const HELP = `yellowbook CLI
   yb collect <runId>                 one poll-and-process pass
   yb status [runId]                  counts and dollars from the database
   yb cancel <runId>
-  yb export <out.csv> [--roles a,b]  Power Almanac columns plus check columns
+  yb export <out.csv> [--roles a,b] [--usable]  Power Almanac columns plus check columns; --usable keeps only contacts whose email you can use
   yb domains                         check every contact email domain still receives mail (DNS only; sends no mail)
   yb compare <earlier_checked.csv>   compare stored checks with an earlier manual pass (benchmark)
 
@@ -37,7 +37,7 @@ const { values: v, positionals } = parseArgs({
     'min-pop': { type: 'string' }, 'max-pop': { type: 'string' }, limit: { type: 'string' },
     kind: { type: 'string' }, 'max-tier': { type: 'string' }, cap: { type: 'string' },
     sync: { type: 'boolean' }, yes: { type: 'boolean' }, 'include-fresh': { type: 'boolean' }, 'ignore-cooldown': { type: 'boolean' },
-    interval: { type: 'string' }, seats: { type: 'string' },
+    interval: { type: 'string' }, seats: { type: 'string' }, usable: { type: 'boolean' },
   },
 });
 const [cmd, ...rest] = positionals;
@@ -160,7 +160,7 @@ async function main() {
     case 'export': {
       const out = rest[0];
       if (!out) throw new Error('Give an output file.');
-      fs.writeFileSync(out, exportCsv(db, { roles: v.roles?.split(','), states: v.states?.split(',') }));
+      fs.writeFileSync(out, exportCsv(db, { roles: v.roles?.split(','), states: v.states?.split(','), usable: v.usable }));
       console.log(`Wrote ${out}`);
       break;
     }

@@ -181,7 +181,7 @@ export async function submitWave(db: Db, client: Anthropic, runId: number, c: Co
 // ---------- collecting ----------
 
 type Outcome =
-  | { kind: 'message'; message: Pick<Anthropic.Messages.Message, 'content' | 'usage' | 'stop_reason'>; rawFile?: string }
+  | { kind: 'message'; message: Pick<Anthropic.Messages.Message, 'content' | 'usage' | 'stop_reason'>; rawFile?: string | null }
   | { kind: 'error'; error: string; retryable: boolean };
 
 export interface CollectResult {
@@ -211,8 +211,8 @@ export async function collectRun(db: Db, client: Anthropic, runId: number, c: Co
       if (r.type === 'succeeded' && r.message) {
         if (grouped.length) {
           // Raw response stored once for the whole group; every seat's check points at it.
-          const rawFile = rawPath(runId, entry.custom_id, c);
-          writeRaw(rawFile, { custom_id: entry.custom_id, tier: items[0].tier, model: modelFor(items[0].tier, c), seats: items.map((i) => i.seat_id), message: r.message });
+          const rawFile = c.storeRaw ? rawPath(runId, entry.custom_id, c) : null;
+          if (rawFile) writeRaw(rawFile, { custom_id: entry.custom_id, tier: items[0].tier, model: modelFor(items[0].tier, c), seats: items.map((i) => i.seat_id), message: r.message });
           outcomes = splitGroupMessage(r.message, items.length).map((m) => ({ kind: 'message', message: m, rawFile }));
         } else outcomes = [{ kind: 'message', message: r.message }];
       } else {
@@ -261,8 +261,9 @@ export function processOutcome(db: Db, runId: number, item: ItemRow, outcome: Ou
     return { checkId: null, escalated: false };
   }
 
-  const file = outcome.rawFile ?? rawPath(runId, `${item.custom_id}-a${attempts}`, c);
-  if (!outcome.rawFile) writeRaw(file, { custom_id: item.custom_id, tier: item.tier, model: modelFor(item.tier, c), message: outcome.message });
+  // Raw responses are kept only with STORE_RAW=true (owner decision: not needed, and too large to back up).
+  const file = outcome.rawFile !== undefined ? outcome.rawFile : c.storeRaw ? rawPath(runId, `${item.custom_id}-a${attempts}`, c) : null;
+  if (file && outcome.rawFile === undefined) writeRaw(file, { custom_id: item.custom_id, tier: item.tier, model: modelFor(item.tier, c), message: outcome.message });
   const fin = finalize(seat, item.tier, outcome.message, batch, new Date(), c);
   db.prepare(`UPDATE runs SET actual_cost_usd = actual_cost_usd + ? WHERE id = ?`).run(fin.cost, runId);
 

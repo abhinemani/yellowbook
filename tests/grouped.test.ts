@@ -8,6 +8,7 @@ import { fakeClient, fakeMessage, fixtureDb, result } from './helpers';
 beforeAll(() => {
   process.env.QC_SAMPLE_RATE = '0';
   process.env.REVIEW_MODE = 'queue';
+  process.env.STORE_RAW = 'true'; // this file checks that a group's raw response is stored once
   process.env.RAW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'yb-raw-g-'));
 });
 
