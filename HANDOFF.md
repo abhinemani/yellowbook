@@ -125,3 +125,16 @@ The owner reviewed all 22 pending pilot checks in chat: 20 accepted, 2 rejected 
 - **Two holders, by owner decision:** Los Angeles County CA and Harris County TX each now have a second Head of Purchasing seat (`slot` 2). It holds the person from the manual pass as a `source = 'manual'` contact, name and title only. The app's own finding is in slot 1. Head of Purchasing is not a `multi` role, so this is a deliberate exception. Re-check both agencies before trusting either name.
 - **Bug fixed:** `splitName` turned trailing credentials into the surname ("Kimberly Williams, JD" was stored as first name "Kimberly Williams,", last name "JD"). It now strips suffixes and common credentials (JD, PhD, MBA, CPPO, CPPB and others). Test added (67 tests). The one bad record was corrected.
 - **Drive:** `outputs/` now holds `yellowbook_2026-11-19_reviewed.sqlite.gz` (current; restore this one) with a fresh `MANIFEST.sha256`, and a results sheet "yellowbook results (2026-11-19, reviewed)". The pre-review copies are kept and renamed `..._before-review`.
+
+## No review queue, several holders per role (owner decision, 2026-11-19)
+
+The owner does not want to review results. `REVIEW_MODE=auto` is now the default (`src/lib/config.ts`, `.env.example`), and every finding is applied as it arrives through `applyCheck` (`src/lib/review.ts`):
+- Replaced, role mismatch or interim **at Medium or High**: the new person takes the seat, and the old contact is kept as `superseded`.
+- **Unclear, or any Low-confidence name:** the person is added beside the current holder in a new slot (`slot` 2, 3...), for any role. This generalizes what the owner chose for LA County and Harris County.
+- Same person found again, or already holding another slot of the role: never added twice. An extra slot whose person turns out to be a duplicate is emptied, and `discover` runs skip emptied extra slots.
+- Confirmations update details. Results that name no one change nothing.
+- The integrity rules are unchanged: email only if seen on a page, High needs a dated source, no personal matters. Hard rule 5 in `CLAUDE.md` is rewritten to match.
+- `REVIEW_MODE=queue` restores the human review queue. The existing queue tests run in that mode, and three new tests cover auto mode (70 tests).
+- Expect more people per role in exports, especially in small agencies where Low confidence is common.
+
+**Batch plan** (not yet sent; the owner approves before sending): 12 batches, about $152 expected and $185 at most, in batch mode. Batch 1 is the 25 largest manual "unable to confirm" purchasing seats (`--seats`). Batches 2-11 are each of the five main roles split at its median population. Batch 12 is the other 14 roles. Run batches 1 and 2 first, then re-check cost and escalation.

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { acceptCheck, acceptConfirmations, listPending, rejectCheck } from '../src/lib/review';
 import { collectRun, createRun, planRun, processOutcome, runSummary, runSync, submitWave, verifySeatNow } from '../src/lib/runs';
 import { selectSeats } from '../src/lib/seats';
@@ -10,6 +10,7 @@ import { fakeClient, fakeMessage, fixtureDb, result, seatId } from './helpers';
 
 beforeAll(() => {
   process.env.QC_SAMPLE_RATE = '0';
+  process.env.REVIEW_MODE = 'queue'; // most tests cover the human review queue; the auto mode has its own block
   process.env.RAW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'yb-raw-'));
 });
 
@@ -18,7 +19,7 @@ const SV_HOME = { url: 'https://samplecity.org', text: 'Welcome to Sampleville.'
 const SV_STAFF = { url: 'https://samplecity.org/finance/purchasing', text: 'Purchasing Manager: Alex New, alex.new@samplecity.org, 555-0210' };
 
 /** Tier 1 settles Example County; Sampleville needs tier 2, where a replacement is found. */
-function script(db: ReturnType<typeof fixtureDb>) {
+function script(db: ReturnType<typeof fixtureDb>, svOver: Record<string, unknown> = {}) {
   const ex = seatId(db, 'Example County', 'head_of_purchasing');
   const sv = seatId(db, 'Sampleville', 'head_of_purchasing');
   return (cid: string, params: any) => {
@@ -29,7 +30,7 @@ function script(db: ReturnType<typeof fixtureDb>) {
       return fakeMessage(result({ status: 'unable_to_confirm', found_name: null, found_title: null, found_email: null, found_phone: null, source_url: null, evidence_date: null, confidence: null, unresolved_reason: 'no_staff_listed' }), { fetches: [SV_HOME] });
     void sv;
     return fakeMessage(
-      result({ status: 'replaced', found_name: 'Alex New', found_title: 'Purchasing Manager', found_email: 'alex.new@samplecity.org', found_phone: '555-0210', source_url: SV_STAFF.url, evidence_date: '2026-05-01', confidence: 'High' }),
+      result({ status: 'replaced', found_name: 'Alex New', found_title: 'Purchasing Manager', found_email: 'alex.new@samplecity.org', found_phone: '555-0210', source_url: SV_STAFF.url, evidence_date: '2026-05-01', confidence: 'High', ...svOver }),
       { searchUrls: [SV_STAFF.url], fetches: [SV_STAFF], inputTokens: 30000, outputTokens: 500 },
     );
   };
@@ -335,5 +336,45 @@ describe('adding agencies and seats by hand', () => {
       for (const prop of Object.values(schema.properties) as any[]) expect(prop.enum && Array.isArray(prop.type)).toBeFalsy();
       expect(schema.properties.confidence.anyOf).toEqual([{ type: 'string', enum: ['High', 'Medium', 'Low'] }, { type: 'null' }]);
     }
+  });
+});
+
+describe('auto review mode (owner decision): findings are applied without a queue, history kept, weak names added', () => {
+  beforeAll(() => { process.env.REVIEW_MODE = 'auto'; });
+  afterAll(() => { process.env.REVIEW_MODE = 'queue'; });
+
+  async function runOnce(db: ReturnType<typeof fixtureDb>, svOver: Record<string, unknown> = {}) {
+    const client = fakeClient(script(db, svOver));
+    const { runId } = createRun(db, { roles: ['head_of_purchasing'], includeFresh: true, ignoreCooldown: true });
+    for (let i = 0; i < 2; i++) { await submitWave(db, client, runId); await collectRun(db, client, runId); }
+  }
+  const holders = (db: ReturnType<typeof fixtureDb>) =>
+    db.prepare(`SELECT s.slot, c.first_name || ' ' || c.last_name who FROM seats s JOIN agencies a ON a.id = s.agency_id JOIN contacts c ON c.id = s.current_contact_id
+                WHERE a.name LIKE '%Sampleville%' AND s.role_key = 'head_of_purchasing' ORDER BY s.slot`).all();
+
+  it('a clear replacement takes the seat at once, the old contact is superseded, nothing waits for review', async () => {
+    const db = fixtureDb();
+    const sv = seatId(db, 'Sampleville', 'head_of_purchasing');
+    const before = (db.prepare(`SELECT current_contact_id c FROM seats WHERE id = ?`).get(sv) as any).c;
+    await runOnce(db);
+    expect(listPending(db)).toHaveLength(0);
+    expect(holders(db)).toEqual([{ slot: 1, who: 'Alex New' }]);
+    expect(db.prepare(`SELECT status FROM contacts WHERE id = ?`).get(before)).toEqual({ status: 'superseded' });
+  });
+
+  it('an unclear or Low-confidence name is added beside the current holder, not in place of them', async () => {
+    const db = fixtureDb();
+    const listed = holders(db) as any[];
+    await runOnce(db, { status: 'unclear', confidence: 'Low', found_email: null, unresolved_reason: 'no_current_source' });
+    expect(holders(db)).toEqual([listed[0], { slot: 2, who: 'Alex New' }]);
+  });
+
+  it('finding the same person again never adds a duplicate holder', async () => {
+    const db = fixtureDb();
+    const over = { status: 'unclear', confidence: 'Low', found_email: null, unresolved_reason: 'no_current_source' };
+    await runOnce(db, over);
+    await runOnce(db, over);
+    expect((holders(db) as any[]).map((h) => h.who).filter((w) => w === 'Alex New')).toHaveLength(1);
+    expect(holders(db)).toHaveLength(2);
   });
 });

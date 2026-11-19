@@ -4,6 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { cfg, type Config } from './config';
 import type { Db } from './db';
 import { estimateRun, tierAssumptions, tierCost, type Estimate } from './estimate';
+import { applyCheck } from './review';
 import { needsEscalation } from './rules';
 import { getSeatContext, selectSeats, type Scope } from './seats';
 import type { Evidence, FinalCheck, RunKind, SeatContext, Tier } from './types';
@@ -260,9 +261,20 @@ export function changesContact(seat: SeatContext, f: FinalCheck): boolean {
 
 const RANK = { Low: 0, Medium: 1, High: 2 } as const;
 
+/** In auto review mode: a clear finding takes the seat; a conflicting or weak one is added beside the current holder. */
+export function applyMode(f: FinalCheck): 'replace' | 'add' {
+  if (f.status === 'unclear' || f.confidence === 'Low' || !f.confidence) return 'add';
+  return 'replace';
+}
+
 export function decideReviewState(seat: SeatContext, f: FinalCheck, c: Config = cfg(), rand: () => number = Math.random): 'pending' | 'auto_accepted' | 'not_needed' {
   if (f.status === 'unable_to_confirm') return 'not_needed';
   if (f.status === 'unclear' && !f.found_name) return 'not_needed';
+  if (c.reviewMode === 'auto') {
+    // Owner decision (2026-11-19): no review queue. Every finding is applied; see applyMode for replace versus add.
+    if (f.status === 'role_mismatch' && !f.found_name) return 'not_needed';
+    return 'auto_accepted';
+  }
   if (f.status !== 'confirmed_in_role') return 'pending'; // anything that changes a contact is a human action
   if (c.autoAcceptAtOrAbove === 'None' || !f.confidence) return 'pending';
   if (RANK[f.confidence] < RANK[c.autoAcceptAtOrAbove]) return 'pending';
@@ -324,8 +336,12 @@ export function insertCheck(db: Db, a: InsertArgs, c: Config = cfg()): number {
         raw: a.rawFile,
         verr: a.validationError,
       });
-    if (review === 'auto_accepted') db.prepare(`UPDATE seats SET last_checked_at = datetime('now') WHERE id = ?`).run(a.seat.seatId);
-    return Number(info.lastInsertRowid);
+    const checkId = Number(info.lastInsertRowid);
+    if (review === 'auto_accepted') {
+      if (c.reviewMode === 'auto') applyCheck(db, checkId, applyMode(f));
+      else db.prepare(`UPDATE seats SET last_checked_at = datetime('now') WHERE id = ?`).run(a.seat.seatId);
+    }
+    return checkId;
   })();
   return id;
 }

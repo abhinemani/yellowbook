@@ -104,21 +104,82 @@ export function acceptCheck(db: Db, checkId: number): void {
     const k = db.prepare('SELECT * FROM checks WHERE id = ?').get(checkId) as CheckRow | undefined;
     if (!k) throw new Error(`No check ${checkId}`);
     if (k.review_state !== 'pending') throw new Error(`Check ${checkId} is not pending`);
-    const seat = getSeatContext(db, k.seat_id)!;
-    const asFinal = { status: k.status, found_name: k.found_name, found_title: k.found_title, found_email: k.found_email, found_phone: k.found_phone } as FinalCheck;
-
-    if (k.status === 'confirmed_in_role') {
-      if (changesContact(seat, asFinal)) newContactVersion(db, k.seat_id, k, true);
-      else db.prepare(`UPDATE seats SET last_checked_at = datetime('now') WHERE id = ?`).run(k.seat_id);
-    } else if (k.found_name && ['replaced', 'role_mismatch', 'vacant_interim', 'unclear'].includes(k.status)) {
-      newContactVersion(db, k.seat_id, k, false);
-    } else if (k.status === 'vacant_interim') {
-      if (seat.contactId) db.prepare(`UPDATE contacts SET status = 'removed', updated_at = datetime('now') WHERE id = ?`).run(seat.contactId);
-      db.prepare(`UPDATE seats SET current_contact_id = NULL, last_checked_at = datetime('now') WHERE id = ?`).run(k.seat_id);
-    }
-    // role_mismatch or unclear without a name: acknowledged, contact left as is and the seat stays flagged by its latest check.
+    applyCheck(db, checkId, 'replace');
     db.prepare(`UPDATE checks SET review_state = 'accepted' WHERE id = ?`).run(checkId);
   })();
+}
+
+const sameName = (a: string | null | undefined, b: string | null | undefined) => {
+  const n = (x: string | null | undefined) => {
+    const { first, last } = splitName(x ?? '');
+    return `${first.split(' ')[0] ?? ''} ${last}`.toLowerCase().replace(/[^a-z ]/g, '').trim();
+  };
+  return !!a && !!b && n(a) !== '' && n(a) === n(b);
+};
+
+/** Other slots of the same role at the same agency, with their holder's name. */
+function siblingHolders(db: Db, seatId: number): { seat_id: number; contact_id: number; name: string }[] {
+  return db
+    .prepare(
+      `SELECT s2.id seat_id, c.id contact_id, TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) name
+       FROM seats s JOIN seats s2 ON s2.agency_id = s.agency_id AND s2.role_key = s.role_key AND s2.id != s.id
+       JOIN contacts c ON c.id = s2.current_contact_id WHERE s.id = ?`,
+    )
+    .all(seatId) as { seat_id: number; contact_id: number; name: string }[];
+}
+
+/**
+ * Write a check's finding into the contact records. History is kept: a replaced contact is marked superseded, never deleted.
+ * mode 'replace': the finding takes the seat. mode 'add': the found person joins the role in a new slot and the
+ * current holder stays (used for conflicting or weak findings, so both people are kept).
+ * A person who already holds another slot of the same role is never added twice.
+ */
+export function applyCheck(db: Db, checkId: number, mode: 'replace' | 'add'): void {
+  const k = db.prepare('SELECT * FROM checks WHERE id = ?').get(checkId) as CheckRow;
+  const seat = getSeatContext(db, k.seat_id)!;
+  const asFinal = { status: k.status, found_name: k.found_name, found_title: k.found_title, found_email: k.found_email, found_phone: k.found_phone } as FinalCheck;
+  const siblings = siblingHolders(db, k.seat_id);
+  const dup = k.found_name ? siblings.find((x) => sameName(x.name, k.found_name)) : undefined;
+
+  if (k.status === 'confirmed_in_role') {
+    if (changesContact(seat, asFinal)) newContactVersion(db, k.seat_id, k, true);
+    else db.prepare(`UPDATE seats SET last_checked_at = datetime('now') WHERE id = ?`).run(k.seat_id);
+  } else if (k.found_name && ['replaced', 'role_mismatch', 'vacant_interim', 'unclear'].includes(k.status)) {
+    if (sameName(seat.contactName, k.found_name)) {
+      newContactVersion(db, k.seat_id, k, true); // same person, new details
+    } else if (dup) {
+      // The found person already holds a sibling slot. This slot's holder is out; do not create a duplicate.
+      if (seat.slot > 1) {
+        if (seat.contactId) db.prepare(`UPDATE contacts SET status = 'superseded', superseded_by = ?, updated_at = datetime('now') WHERE id = ?`).run(dup.contact_id, seat.contactId);
+        db.prepare(`UPDATE seats SET current_contact_id = NULL, last_checked_at = datetime('now') WHERE id = ?`).run(k.seat_id);
+      } else {
+        db.prepare(`UPDATE seats SET last_checked_at = datetime('now') WHERE id = ?`).run(k.seat_id);
+      }
+    } else if (mode === 'add' && seat.contactId) {
+      addHolder(db, k.seat_id, k);
+    } else {
+      newContactVersion(db, k.seat_id, k, false);
+    }
+  } else if (k.status === 'vacant_interim') {
+    if (seat.contactId) db.prepare(`UPDATE contacts SET status = 'removed', updated_at = datetime('now') WHERE id = ?`).run(seat.contactId);
+    db.prepare(`UPDATE seats SET current_contact_id = NULL, last_checked_at = datetime('now') WHERE id = ?`).run(k.seat_id);
+  }
+  // role_mismatch or unclear without a name: nothing to write; the seat stays flagged by its latest check.
+}
+
+/** Put the found person in a new slot of the same role, leaving the current holder in place. */
+function addHolder(db: Db, seatId: number, k: CheckRow): number {
+  const seat = db.prepare('SELECT agency_id, role_key FROM seats WHERE id = ?').get(seatId) as { agency_id: number; role_key: string };
+  const { first, last } = splitName(k.found_name!);
+  const cid = Number(
+    db
+      .prepare(`INSERT INTO contacts (agency_id, first_name, last_name, title, email, email_is_generic, phone, source) VALUES (?,?,?,?,?,?,?, 'web_check')`)
+      .run(seat.agency_id, first, last, k.found_title, k.found_email, k.found_email ? k.found_email_generic : 0, k.found_phone).lastInsertRowid,
+  );
+  const slot = (db.prepare(`SELECT MAX(slot) m FROM seats WHERE agency_id = ? AND role_key = ?`).get(seat.agency_id, seat.role_key) as { m: number }).m + 1;
+  db.prepare(`INSERT INTO seats (agency_id, role_key, current_contact_id, slot, last_checked_at) VALUES (?, ?, ?, ?, datetime('now'))`).run(seat.agency_id, seat.role_key, cid, slot);
+  db.prepare(`UPDATE seats SET last_checked_at = datetime('now') WHERE id = ?`).run(seatId);
+  return cid;
 }
 
 export function rejectCheck(db: Db, checkId: number): void {

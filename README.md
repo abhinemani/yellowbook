@@ -15,7 +15,7 @@ Contact lists for city and county officials go stale fast. In a first manual pas
 - **Verify at any scope.** "Head of Finance, counties over 250,000 people, not checked in 12 months." See the seat count and estimated cost before it runs, and set a spend cap.
 - **Cheap by design.** A cheap model reads the agency's own site first, with no paid search. Web search is paid for only on seats that first pass cannot settle. Bulk runs use the Batch API at half price. See `docs/COST.md`.
 - **Search and add agencies.** Look an agency up in the database; if it is missing, find it on the web, confirm it, add it, then discover contacts for the roles you choose.
-- **Review before anything changes.** Findings go to a review queue with the source link. Accepting a replacement keeps the old contact as history.
+- **Applied automatically, history kept.** Findings are applied without review by default: a clear replacement takes the seat, a weak or conflicting name is added beside the current holder, and every old contact is kept as history. Set `REVIEW_MODE=queue` to review first.
 - **Import and export Power Almanac CSVs**, with extra columns for the check results.
 
 ## Repo layout

@@ -53,6 +53,8 @@ export function cfg() {
     escalateBelow: str('ESCALATE_BELOW', 'Medium') as Confidence,
     /** Confirmations at or above this confidence are accepted without a human. Replacements never are. */
     autoAcceptAtOrAbove: str('AUTO_ACCEPT', 'High') as Confidence | 'None',
+    /** 'auto' (owner decision, default): every finding is applied with no review queue. 'queue': the original human review. */
+    reviewMode: (str('REVIEW_MODE', 'auto') === 'queue' ? 'queue' : 'auto') as 'auto' | 'queue',
     qcSampleRate: num('QC_SAMPLE_RATE', 0.05),
     /** Planning guess until real runs supply a measured rate: share of seats that tier 1 cannot settle. */
     escalationRateGuess: num('ESCALATION_RATE_GUESS', 0.4),

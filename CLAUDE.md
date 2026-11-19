@@ -20,7 +20,7 @@ yellowbook verifies and maintains government contacts. Agencies have seats (role
 2. **Never record a guessed email as an email.** An address is stored only if it appears verbatim in fetched page text. Pattern guesses go in notes as "Pattern guess (UNVERIFIED)". This is enforced in code, not only in the prompt.
 3. **"High" confidence requires a dated (2025+) official source.** Undated live pages are Medium at most.
 4. **Separate "not searched" from "not found".** Tool refusals and blocks set `unresolved_reason` (`budget_exhausted`, `fetch_blocked`) and are retried; they are never reported as "the person is gone".
-5. **Replacements are never auto-applied.** Accepting a change is a human action in the review queue. History is kept (`superseded`), never overwritten.
+5. **Findings are applied automatically; history is never overwritten.** Owner decision (2026-11-19): no review queue by default (`REVIEW_MODE=auto`). A clear finding replaces the holder and the old contact is kept as `superseded`. An unclear or Low-confidence name is added beside the holder in a new slot, so a role can hold several people. The same person is never added twice. `REVIEW_MODE=queue` restores human review. All of it goes through `applyCheck` in `src/lib/review.ts`.
 6. **No personal matters in notes** (allegations, arrests, disputes). Evidence and dates only.
 7. **Counts come from the database,** never from a model's own summary of how many it did.
 8. **Show estimated cost and seat count before any bulk run starts,** and let the user cancel.

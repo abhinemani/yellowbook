@@ -50,6 +50,6 @@ An undated live page is never High, even though it is "live today". This was the
 
 ## Review and quality control
 
-- Accepting a replacement is always a human action. Confirmations at High can auto-accept.
+- Findings are applied automatically by default (owner decision, 2026-11-19): clear findings replace the holder, and unclear or Low-confidence names are added beside the holder. The rules above still decide what a finding may contain. `REVIEW_MODE=queue` restores human review.
 - Sample 5% of accepted findings each run for a second look (different prompt or a human), and record the disagreement rate in the run.
 - A check older than `STALE_MONTHS` (default 12) makes the seat "due".
