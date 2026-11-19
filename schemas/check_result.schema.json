@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CheckResult",
+  "description": "What the model must return for one seat check. Validate every response against this before writing to the database; reject and retry once on failure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "found_name", "found_title", "found_email", "found_email_is_generic", "found_phone", "source_url", "evidence_date", "confidence", "unresolved_reason", "notes"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["confirmed_in_role", "replaced", "role_mismatch", "vacant_interim", "unclear", "unable_to_confirm"]
+    },
+    "found_name":  { "type": ["string", "null"], "description": "CURRENT holder (repeat the listed person if confirmed). null if unknown." },
+    "found_title": { "type": ["string", "null"] },
+    "found_email": { "type": ["string", "null"], "description": "Only an address seen verbatim on a fetched page. Never a guess." },
+    "found_email_is_generic": { "type": "boolean", "description": "true for office mailboxes like purchasing@, procurement@, info@" },
+    "found_phone": { "type": ["string", "null"] },
+    "source_url":  { "type": ["string", "null"], "description": "Single best page that supports the finding." },
+    "evidence_date": { "type": ["string", "null"], "description": "ISO date the source states (publication, meeting, release). null if the page is undated." },
+    "confidence": { "type": ["string", "null"], "enum": ["High", "Medium", "Low", null], "description": "High requires a dated (2025 or later) official source. Undated live official page = Medium at most." },
+    "unresolved_reason": {
+      "type": ["string", "null"],
+      "enum": ["not_searched", "budget_exhausted", "fetch_blocked", "no_staff_listed", "no_current_source", null],
+      "description": "Required when status is unable_to_confirm or unclear; otherwise null."
+    },
+    "notes": { "type": "string", "description": "1-2 sentences: evidence and its date, caveats. Put any inferred email here prefixed 'Pattern guess (UNVERIFIED):'. No allegations, arrests, or personal matters." }
+  }
+}

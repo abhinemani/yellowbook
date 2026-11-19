@@ -1,0 +1,62 @@
+/* yellowbook design tokens: the "Sovra look".
+   Source of truth for the palette/typography is docs/DESIGN.md. */
+
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap");
+
+:root {
+  /* Palette */
+  --navy:    #14213D;   /* dominant: nav, headers, hero areas, primary buttons */
+  --maroon:  #7A1F2B;   /* emphasis, icon circles, destructive/attention accents */
+  --rose:    #D06470;   /* highlights ON navy only (links, active states, key numbers) */
+  --steel:   #8DA2C0;   /* secondary text and fills, borders on navy */
+  --tint:    #EEF1F6;   /* light page/section background */
+  --slate:   #5A6478;   /* body text on light backgrounds */
+  --white:   #FFFFFF;
+
+  /* Derived surfaces (keep contrast >= 4.5:1 for text) */
+  --navy-2:  #1B2B4D;   /* raised surface on navy */
+  --line:    #D5DCE8;   /* hairlines on light backgrounds */
+  --line-on-navy: rgba(141, 162, 192, 0.28);
+
+  /* Check-status colors (text + fill); never rely on color alone: always show the label */
+  --st-confirmed-fg: #14213D; --st-confirmed-bg: #DCE4F0;
+  --st-replaced-fg:  #7A1F2B; --st-replaced-bg:  #F3DDE0;
+  --st-mismatch-fg:  #7A1F2B; --st-mismatch-bg:  #F8EBEC;
+  --st-vacant-fg:    #5A6478; --st-vacant-bg:    #E6EAF1;
+  --st-unclear-fg:   #5A6478; --st-unclear-bg:    #EEF1F6;
+  --st-unable-fg:    #5A6478; --st-unable-bg:     #FFFFFF;  /* outlined chip */
+  --st-unchecked-fg: #8DA2C0; --st-unchecked-bg:  transparent;
+
+  /* Type */
+  --font: "Open Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --fw-light: 300;   /* headlines and big numbers */
+  --fw-regular: 400; /* body */
+  --fw-bold: 700;    /* labels, bolded lead-in phrases */
+
+  /* Shape and spacing */
+  --radius: 6px;
+  --radius-pill: 999px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px;
+}
+
+html { font-family: var(--font); color: var(--slate); background: var(--tint); }
+h1, h2, h3, .big-number { font-family: var(--font); font-weight: var(--fw-light); color: var(--navy); letter-spacing: -0.01em; }
+.on-navy { background: var(--navy); color: var(--steel); }
+.on-navy h1, .on-navy h2, .on-navy h3, .on-navy .big-number { color: var(--white); }
+.on-navy a, .on-navy .accent { color: var(--rose); }
+
+/* Line icon in a colored circle: the signature motif. Icons are 1.5px-stroke line icons, no fills, no stock imagery. */
+.icon-circle { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--maroon); color: var(--white); }
+.icon-circle.navy { background: var(--navy); }
+.icon-circle svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.chip { display: inline-block; padding: 2px 10px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 600; }
+.chip.confirmed { color: var(--st-confirmed-fg); background: var(--st-confirmed-bg); }
+.chip.replaced  { color: var(--st-replaced-fg);  background: var(--st-replaced-bg); }
+.chip.mismatch  { color: var(--st-mismatch-fg);  background: var(--st-mismatch-bg); }
+.chip.vacant    { color: var(--st-vacant-fg);    background: var(--st-vacant-bg); }
+.chip.unclear   { color: var(--st-unclear-fg);   background: var(--st-unclear-bg); }
+.chip.unable    { color: var(--st-unable-fg);    background: var(--st-unable-bg); border: 1px solid var(--line); }
+.chip.unchecked { color: var(--st-unchecked-fg); background: var(--st-unchecked-bg); border: 1px dashed var(--line); }
