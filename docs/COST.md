@@ -40,6 +40,10 @@ With Haiku on the Batch API, a page read costs a small fraction of a cent. **A s
 - **Search results are tokens too.** Each search adds its results to the input. The default assumption (about 5,000 tokens per search) is a guess.
 - **Batch search is throttled per organization**, so a large batch can take longer. It does not cost more.
 
+## First measurement (25-seat pilot, 2026-11-19)
+
+The largest 25 purchasing seats, sync (full price): $1.02 total, $0.041 a seat. Tier 1 averaged 48k input and 790 output tokens ($0.009); tier 2 averaged 86k input, 1,450 output and 1.55 searches ($0.040). 80% of seats escalated. Token use is about 3x the assumptions below, and escalation twice the guess, so read the table below as roughly a third of the real cost until the estimator has 50 tier-1 checks. Large governments may escalate more than small ones; the next runs will show.
+
 ## Estimates (assumptions, not measurements)
 
 Assumed per seat: tier 1 about 14,000 input and 450 output tokens, no search; tier 2 about 32,000 input and 600 output tokens plus 2 searches; 40% of seats escalate. Batch pricing, Haiku for both tiers. Computed by `npm run plan` on the four Power Almanac exports (6,360 seats).

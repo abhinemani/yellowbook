@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-11-19 (end of the session that built the app). Read this first, then `CLAUDE.md`.
+Last updated: 2026-11-19 (pilot session: first live run). Read this first, then `CLAUDE.md`.
 
 ## Where things stand
 
@@ -90,3 +90,20 @@ Cloud sessions never received `ANTHROPIC_API_KEY` from the environment settings,
 - The run failed on every seat with `400 invalid_request_error: Requests sent from a sandbox with restricted network access are not allowed to use tool web_fetch_20250910`. Web search is allowed; only web fetch is refused. No tokens spent, no checks stored, no seat marked checked.
 - The owner approved switching the yellowbook environment to **unrestricted** network. The session picked up the network change (arbitrary hosts load) but the API kept refusing web fetch, so the API appears to classify the sandbox at container start. **Next step: start a fresh session on the yellowbook environment, run one tiny web_fetch call to confirm, then the pilot.** If fresh sessions are still refused, run the pilot on the owner's own machine (the original "local first" plan) or open a question about whether tier 1 can work without fetch (it cannot satisfy the email-on-page rule without page text).
 - Fixed: immediate (`--sync`) runs retried 4xx errors three times. `isRetryableStatus` in `src/lib/runs.ts` now retries only network errors, 408, 409, 429 and 5xx, matching the batch path. Test added (65 tests).
+
+## Pilot run (2026-11-19, fresh session): it works
+
+- **Web fetch is allowed in a fresh session** after the environment went unrestricted. Confirmed with one tiny call, then the pilot.
+- **First attempt (run 1): all 25 seats stored as `model_error`.** The research was fine; the JSON was not. The prompt said "match `schemas/check_result.schema.json`" but the model never saw the schema, so Haiku invented its own field names (nested `current_holder` objects and similar), and the retry did the same. **Fix:** `buildParams` now sends the schema as a structured output (`output_config.format`, `json_schema`), so responses are constrained to it. The API rejects `enum` next to a type list like `["string","null"]`, so `outputSchema()` in `src/lib/verifier.ts` rewrites nullable enums as `anyOf`; Ajv still validates against the file. Works alongside the web tools and applies to batch requests too. Test added (66 tests).
+- **Second attempt (run 2), same 25 seats (`--ignore-cooldown`, since run 1's model errors put them on cooldown), sync, full price: $1.02 total, about $0.041 per seat.** Final outcome per seat: 7 confirmed, 7 replaced, 2 role mismatch, 3 vacant/interim, 4 unclear, 2 unable to confirm. Confidence: 4 High, 16 Medium, 3 Low. 22 waiting in the review queue, 3 auto-accepted.
+- **Measured usage (run 2):** tier 1 averages 48k input / 790 output tokens ($0.009 a seat, max $0.053); tier 2 averages 86k input / 1,450 output and 1.55 searches ($0.040 a seat, max $0.154). That is about 3x the tier-1 assumption and 2.7x tier-2. **20 of 25 seats escalated (80%, assumed 40%).** The estimator now uses measured tokens but keeps the 40% guess until tier 1 has 50 checks, so `plan` currently understates: at 80% the full purchasing run (1,429 seats, batch) is about $27, over the $25 default cap.
+- **Accuracy against the manual pass (`yb compare`, 24 seats matched):** of 17 seats the manual pass had settled, 13 agree exactly. 4 disagree (1 manual-confirmed now replaced; 3 manual-replaced now role mismatch, unclear or vacant). Of 7 the manual pass could not confirm, the app settled 6. These disagreements are the first things to look at in the review queue.
+- Judgment call to confirm: `emailOnPage` accepts an address that appears in a search result's cited text, not only in a fetched page (one seat's email came that way after its fetch failed). Cited text is verbatim page text, so this seems within rule 2, but it is the owner's call.
+
+## Next steps (replaces the list above)
+
+1. **Review the 22 pending checks** in the UI (`npm run dev`, review queue), starting with the 4 disagreements. That settles D-5 (is Haiku good enough?).
+2. **Decide on tier 1.** It escalated 80% on the largest governments, which have big sites. Options: start large agencies at tier 2, raise the tier-1 fetch budget, or keep it and see whether smaller governments settle at tier 1 more often (likely: smaller sites).
+3. **Set the cap and run in batch:** the 25 unresolved seats from the manual pass, then purchasing by size. Expect about $0.02 a seat in batch at current rates; raise `--cap` or split by `--min-pop` to stay under $25 per run.
+4. Update `docs/COST.md` and the estimator defaults once 50+ tier-1 checks exist (the rate becomes measured automatically).
+5. `data/` is not in git: a new session must re-upload the six CSVs, re-import, and the pilot's checks will be gone (the SQLite file lives in the container).
