@@ -165,3 +165,11 @@ JOIN agencies a ON a.id = s.agency_id
 JOIN roles r    ON r.key = s.role_key
 LEFT JOIN contacts c ON c.id = s.current_contact_id
 LEFT JOIN checks k ON k.id = (SELECT id FROM checks WHERE seat_id = s.id ORDER BY checked_at DESC, id DESC LIMIT 1);
+
+-- v2: whether each contact email domain still receives mail (DNS MX lookup). Domains only; no addresses.
+CREATE TABLE IF NOT EXISTS email_domains (
+  domain      TEXT PRIMARY KEY COLLATE NOCASE,
+  status      TEXT NOT NULL CHECK (status IN ('mx','a_only','no_mail','nxdomain','error')),
+  mx_hosts    TEXT,                                   -- comma-separated, lowest preference first
+  checked_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);

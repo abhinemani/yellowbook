@@ -1,5 +1,12 @@
+import { emailDomainStatus } from './domains';
 import { stringify } from 'csv-stringify/sync';
 import type { Db } from './db';
+
+const DOMAIN_LABEL: Record<string, string> = { mx: 'Receives mail', a_only: 'No mail server listed', no_mail: 'Accepts no mail', nxdomain: 'Domain does not exist', error: 'Lookup failed' };
+function domainLabel(db: Db, email: string | null): string {
+  const st = emailDomainStatus(db, email);
+  return st ? DOMAIN_LABEL[st] : '';
+}
 
 /** Same columns and order as the Power Almanac exports, then the check columns. One row per seat. */
 export const PA_COLUMNS = [
@@ -9,7 +16,7 @@ export const PA_COLUMNS = [
   'Government Main Phone Number', 'Government Street Address', 'Government City', 'Government State', 'Government Zip Code',
   'Population', 'Last Verified Date', 'Fiscal Year End', 'Update Status',
 ] as const;
-export const CHECK_COLUMNS = ['Check Status', 'Current Name', 'Current Title', 'Current Email', 'Current Phone', 'Source URL', 'Confidence', 'Check Notes', 'Review State', 'Checked At'] as const;
+export const CHECK_COLUMNS = ['Check Status', 'Current Name', 'Current Title', 'Current Email', 'Current Phone', 'Source URL', 'Confidence', 'Check Notes', 'Review State', 'Checked At', 'Email Domain Status'] as const;
 
 const STATUS_LABEL: Record<string, string> = {
   confirmed_in_role: 'Confirmed in role',
@@ -52,6 +59,7 @@ export function exportCsv(db: Db, opts: { roles?: string[]; states?: string[] } 
     'Check Status': statusLabel(r.k_status as string | null), 'Current Name': r.found_name, 'Current Title': r.found_title,
     'Current Email': r.found_email, 'Current Phone': r.found_phone, 'Source URL': r.source_url, Confidence: r.confidence,
     'Check Notes': r.notes, 'Review State': r.review_state, 'Checked At': r.checked_at,
+    'Email Domain Status': domainLabel(db, r.email as string | null),
   }));
   return stringify(records, { header: true, columns: [...PA_COLUMNS, ...CHECK_COLUMNS] });
 }

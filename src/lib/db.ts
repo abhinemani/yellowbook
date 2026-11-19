@@ -14,7 +14,7 @@ interface RoleSeed {
   multi?: boolean;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /** Open (and if needed create) the database, apply db/schema.sql, seed roles from config/roles.json. */
 export function openDb(file: string = cfg().databasePath): Db {
@@ -28,6 +28,18 @@ export function openDb(file: string = cfg().databasePath): Db {
     db.pragma(`user_version = ${SCHEMA_VERSION}`);
   } else if (version > SCHEMA_VERSION) {
     throw new Error(`Database schema v${version} is newer than this code (v${SCHEMA_VERSION}).`);
+  } else if (version < SCHEMA_VERSION) {
+    // Apply db/migrations/NNN_*.sql for each version above the current one, in order.
+    const dir = path.resolve(/* turbopackIgnore: true */ cfg().root, 'db/migrations');
+    const files = fs.readdirSync(dir).filter((f) => /^\d{3}_.*\.sql$/.test(f)).sort();
+    for (const f of files) {
+      const v = Number(f.slice(0, 3));
+      if (v <= version || v > SCHEMA_VERSION) continue;
+      db.transaction(() => {
+        db.exec(fs.readFileSync(path.join(dir, f), 'utf8'));
+        db.pragma(`user_version = ${v}`);
+      })();
+    }
   }
   seedRoles(db);
   return db;

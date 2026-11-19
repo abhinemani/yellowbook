@@ -7,6 +7,7 @@ import { cfg } from '../src/lib/config';
 import { openDb } from '../src/lib/db';
 import { usd } from '../src/lib/estimate';
 import { exportCsv, statusLabel } from '../src/lib/export';
+import { checkDomains } from '../src/lib/domains';
 import { importPowerAlmanac } from '../src/lib/importer';
 import { cancelRun, collectRun, createRun, getRun, planRun, refreshRunStatus, runSummary, runSync, submitWave } from '../src/lib/runs';
 import type { Scope } from '../src/lib/seats';
@@ -22,6 +23,7 @@ const HELP = `yellowbook CLI
   yb status [runId]                  counts and dollars from the database
   yb cancel <runId>
   yb export <out.csv> [--roles a,b]  Power Almanac columns plus check columns
+  yb domains                         check every contact email domain still receives mail (DNS only; sends no mail)
   yb compare <earlier_checked.csv>   compare stored checks with an earlier manual pass (benchmark)
 
 scope:  --roles head_of_purchasing,head_of_finance  --states MO,KS  --category county  --min-pop 50000  --max-pop N
@@ -147,6 +149,14 @@ async function main() {
       await cancelRun(db, cfg().apiKey ? getClient() : null, Number(rest[0]));
       console.log('Canceled.');
       break;
+    case 'domains': {
+      const counts = await checkDomains(db);
+      const dead = db.prepare(`SELECT COUNT(*) n FROM contacts c JOIN email_domains d ON d.domain = lower(substr(c.email, instr(c.email,'@')+1))
+                               WHERE c.status = 'active' AND d.status IN ('nxdomain','no_mail')`).get() as { n: number };
+      console.log('Email domains:', counts);
+      console.log(`Active contacts on a domain that cannot receive mail: ${dead.n}`);
+      break;
+    }
     case 'export': {
       const out = rest[0];
       if (!out) throw new Error('Give an output file.');
