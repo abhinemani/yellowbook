@@ -6,7 +6,11 @@ import type { Confidence, FinalCheck } from './types';
 
 /** Split "Jane Q. Doe Jr." into first/last. Good enough for display; the full string is kept in first_name when unsure. */
 export function splitName(full: string): { first: string; last: string } {
-  const parts = full.replace(/\s+/g, ' ').trim().replace(/,?\s+(jr|sr|ii|iii|iv)\.?$/i, '').split(' ');
+  let name = full.replace(/\s+/g, ' ').trim();
+  // Drop trailing generational suffixes and credentials ("Jr.", "II", ", JD", ", CPPO, CPPB", "MBA").
+  const tail = /,?\s+(jr|sr|ii|iii|iv|j\.?d|ph\.?d|m\.?b\.?a|m\.?p\.?a|c\.?p\.?a|esq|cppo|cppb|cpsm|cpm|nigp-cpp|cpcm|pmp)\.?$/i;
+  while (tail.test(name)) name = name.replace(tail, '');
+  const parts = name.replace(/,$/, '').split(' ');
   if (parts.length === 1) return { first: '', last: parts[0] };
   return { first: parts.slice(0, -1).join(' '), last: parts[parts.length - 1] };
 }

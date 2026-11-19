@@ -118,3 +118,10 @@ Contact data stays out of git (hard rule 1); the owner's Google Drive holds it i
 
 **End of every session:** `npm run snapshot` writes `data/snapshot/` (gzipped database, raw responses tar.gz, results CSV, sha256 manifest) and warns about any file over the limit. Upload those files to `outputs/` with the Drive connector (`create_file`, `disableConversionToGoogleType: true`, file reference `sha256:<hash>:<path>`). Raw archives will pass the limit as runs grow: split per run.
 **Start of a session:** download from Drive into `data/`, gunzip the database, and check the hashes against the manifest. Restoring through the connector is untested.
+
+## Pilot review applied (2026-11-19)
+
+The owner reviewed all 22 pending pilot checks in chat: 20 accepted, 2 rejected (Orange County CA and Clark County NV, where the only evidence for the name was LinkedIn). Nothing is pending now.
+- **Two holders, by owner decision:** Los Angeles County CA and Harris County TX each now have a second Head of Purchasing seat (`slot` 2). It holds the person from the manual pass as a `source = 'manual'` contact, name and title only. The app's own finding is in slot 1. Head of Purchasing is not a `multi` role, so this is a deliberate exception. Re-check both agencies before trusting either name.
+- **Bug fixed:** `splitName` turned trailing credentials into the surname ("Kimberly Williams, JD" was stored as first name "Kimberly Williams,", last name "JD"). It now strips suffixes and common credentials (JD, PhD, MBA, CPPO, CPPB and others). Test added (67 tests). The one bad record was corrected.
+- **Drive:** `outputs/` now holds `yellowbook_2026-11-19_reviewed.sqlite.gz` (current; restore this one) with a fresh `MANIFEST.sha256`, and a results sheet "yellowbook results (2026-11-19, reviewed)". The pre-review copies are kept and renamed `..._before-review`.

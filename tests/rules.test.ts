@@ -263,3 +263,14 @@ describe('sync retry policy', () => {
     for (const s of [429, 500, 529, 408, undefined]) expect(isRetryableStatus(s)).toBe(true);
   });
 });
+
+import { splitName } from '../src/lib/review';
+describe('splitName', () => {
+  it('drops credentials and suffixes so they never become the surname', () => {
+    expect(splitName('Jane Example, JD')).toEqual({ first: 'Jane', last: 'Example' });
+    expect(splitName('Jane Q. Example, CPPO, CPPB')).toEqual({ first: 'Jane Q.', last: 'Example' });
+    expect(splitName('John Example II')).toEqual({ first: 'John', last: 'Example' });
+    expect(splitName('Pat Example MBA')).toEqual({ first: 'Pat', last: 'Example' });
+    expect(splitName('Pat Example')).toEqual({ first: 'Pat', last: 'Example' });
+  });
+});
