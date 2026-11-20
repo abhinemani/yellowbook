@@ -8,6 +8,7 @@ import { openDb } from '../src/lib/db';
 import { usd } from '../src/lib/estimate';
 import { exportCsv, statusLabel } from '../src/lib/export';
 import { checkDomains } from '../src/lib/domains';
+import { knownPeopleCsv } from '../src/lib/guess';
 import { importPowerAlmanac } from '../src/lib/importer';
 import { cancelRun, collectRun, createRun, getRun, planRun, refreshRunStatus, runSummary, runSync, submitWave } from '../src/lib/runs';
 import type { Scope } from '../src/lib/seats';
@@ -23,6 +24,7 @@ const HELP = `yellowbook CLI
   yb status [runId]                  counts and dollars from the database
   yb cancel <runId>
   yb export <out.csv> [--roles a,b] [--usable]  Power Almanac columns plus check columns; --usable keeps only contacts whose email you can use
+  yb known <out.csv> [--roles a,b]   people confirmed in a seat with no usable email, plus an UNVERIFIED email guess (never stored)
   yb domains                         check every contact email domain still receives mail (DNS only; sends no mail)
   yb compare <earlier_checked.csv>   compare stored checks with an earlier manual pass (benchmark)
 
@@ -155,6 +157,13 @@ async function main() {
                                WHERE c.status = 'active' AND d.status IN ('nxdomain','no_mail')`).get() as { n: number };
       console.log('Email domains:', counts);
       console.log(`Active contacts on a domain that cannot receive mail: ${dead.n}`);
+      break;
+    }
+    case 'known': {
+      const out = rest[0];
+      if (!out) throw new Error('Give an output file.');
+      fs.writeFileSync(out, knownPeopleCsv(db, { roles: v.roles?.split(',') }));
+      console.log(`Wrote ${out}`);
       break;
     }
     case 'export': {
