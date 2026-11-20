@@ -187,3 +187,10 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 - **Open:** merge the working branch (everything since PR #4); 14 seats errored on over-1M-token documents in runs 5-6 (not retried); seats still "unable" or "unclear" can be retried after `COOLDOWN_DAYS` (30); scheduled re-checks are not built.
 
 **Usable contacts by role (2026-11-20):** Drive folder **usable contacts by role** (`1AB5WL_rOVZ0CFMM3ZZ_qivKlp5W8t6EI`), one Google Sheet per role: Finance 890, Top Appointed 830, IT 717, Deputy 702, Purchasing 600, Other roles 132 (clerk, GIS, communications and the smaller roles), 3,871 in total. Regenerate with `npm run export -- out.csv --usable --roles <role_key>`.
+
+## Re-check of the 13 top-100 cities with no usable contact (runs 8-9, 2026-11-20)
+
+- Owner asked to look them up at once: 47 seats run immediately (full price) with `--max-tier 3` (Sonnet for whatever tier 2 left), plus a discover run for 2 empty seats. **$7.71** (estimate $3.12; tier 3 averaged 35 cents a seat).
+- Result: usable contacts at **3 of the 13** now (Seattle, Oakland, Buffalo; 4 contacts). Top-100 city coverage is 90 of 100.
+- Why the rest are still not usable: in 24 seats the person is confirmed in office (often from 2025-26 press releases), but no email exists anywhere, neither in Power Almanac nor on any official page. 7 more are new people whose email is not published. These cities do not publish staff email; retrying will not change that. A "known person, no email" list (name, title, phone, source) is the useful output for them if the owner wants it.
+- Census matching for the top-100 question: `scratchpad` scripts only (Census 2025 vintage files); four top-100 counties have no government (Middlesex, Essex, Worcester MA; Capitol Planning Region CT).
