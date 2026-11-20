@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 out=data/snapshot
 day=$(date -u +%Y-%m-%d)
 mkdir -p "$out"
-rm -f "$out"/*
+find "$out" -maxdepth 1 -type f -delete
 
 # Fold the WAL into the main file so the copy is complete.
 node -e "const D=require('better-sqlite3');const d=new D('data/yellowbook.sqlite');d.pragma('wal_checkpoint(TRUNCATE)');d.close()"

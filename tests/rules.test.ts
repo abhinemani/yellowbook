@@ -290,3 +290,34 @@ describe('emailQuality: which emails the owner can use', () => {
     expect(emailQuality({ ...base, k_status: 'replaced' }, 'mx')).toBeNull(); // old address kept on a new person would be wrong
   });
 });
+
+import { agencyFormat, detectPattern, nameParts, noteGuess, render } from '../src/lib/guess';
+describe('unverified email guesses (export only, never stored)', () => {
+  it('detects the pattern behind an address', () => {
+    expect(detectPattern('jane.doe@examplecounty.gov', 'Jane', 'Doe')).toBe('first.last');
+    expect(detectPattern('jdoe@examplecounty.gov', 'Jane', 'Doe')).toBe('flast');
+    expect(detectPattern('JDoe2@examplecounty.gov', 'Jane Q.', 'Doe')).toBe('flast');
+    expect(detectPattern('purchasing@examplecounty.gov', 'Jane', 'Doe')).toBeNull();
+  });
+  it('needs two agreeing addresses on one domain before it trusts a format', () => {
+    expect(agencyFormat([{ email: 'jane.doe@example.gov', first: 'Jane', last: 'Doe' }])).toBeNull();
+    const f = agencyFormat([
+      { email: 'jane.doe@example.gov', first: 'Jane', last: 'Doe' },
+      { email: 'pat.lee@example.gov', first: 'Pat', last: 'Lee' },
+      { email: 'xyz@example.gov', first: 'Sam', last: 'Roe' },
+    ]);
+    expect(f).toEqual({ pattern: 'first.last', domain: 'example.gov', seen: 2, of: 3 });
+    expect(agencyFormat([
+      { email: 'jane.doe@example.gov', first: 'Jane', last: 'Doe' },
+      { email: 'plee@example.gov', first: 'Pat', last: 'Lee' },
+      { email: 'sroe@example.gov', first: 'Sam', last: 'Roe' },
+      { email: 'alex.new@example.gov', first: 'Alex', last: 'New' },
+    ])).toBeNull(); // two patterns, neither a clear majority
+  });
+  it('builds a guess from name parts and reads the model\'s guess from notes', () => {
+    const np = nameParts('María José', "O'Neil-Smith")!;
+    expect(render('first.last', np.f, np.l)).toBe('maria.oneilsmith');
+    expect(noteGuess('Undated page. Pattern guess (UNVERIFIED): jdoe@examplecounty.gov.')).toBe('jdoe@examplecounty.gov');
+    expect(noteGuess('No guess here.')).toBeNull();
+  });
+});
