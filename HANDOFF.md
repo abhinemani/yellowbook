@@ -138,3 +138,52 @@ The owner does not want to review results. `REVIEW_MODE=auto` is now the default
 - Expect more people per role in exports, especially in small agencies where Low confidence is common.
 
 **Batch plan** (not yet sent; the owner approves before sending): 12 batches, about $152 expected and $185 at most, in batch mode. Batch 1 is the 25 largest manual "unable to confirm" purchasing seats (`--seats`). Batches 2-11 are each of the five main roles split at its median population. Batch 12 is the other 14 roles. Run batches 1 and 2 first, then re-check cost and escalation.
+
+## Batches 1 and 2, email domains, grouped requests (2026-11-19)
+
+- **Batch 1** (run 3, the 25 hardest purchasing seats): 9 confirmed, 6 replaced, 8 unclear (names added beside the holder), 1 interim, 1 still unable. $0.95.
+- **Batch 2** (run 4, 690 purchasing seats at population 107k and up): 246 confirmed, 138 replaced, 47 role mismatch, 15 vacant or interim, 151 unclear, 93 unable to confirm. $17.35 (estimated $13). 58 purchasing seats now have extra holders. 20 retries were re-sent under the new limits.
+- **Fixes during the runs:** `watch` stopped after tier-1 results instead of sending the escalations, and stopped on retries; `MAX_OUTPUT_TOKENS` 1500 → 3000 (5 of 739 responses hit it).
+- **Email domains** (`yb domains`, schema v2): DNS over HTTPS (plain DNS is blocked in the container), domain names only. 1,993 of 2,017 domains receive mail; 24 active contacts sit on domains that cannot. Exported as "Email Domain Status". Paid mailbox verification not added (needs the license answer, D-3).
+- **Grouped requests** (schema v3, `GROUP_BY_AGENCY=true`, batch runs only): one request per agency and tier, split back into per-seat checks through `finalize`, `applyRules` and `processOutcome`, so every rule still applies per seat; the raw response is stored once per group. Validated live twice. Sync runs stay per seat.
+- **The 100k price step** (see `docs/COST.md`): `MAX_CONTENT_TOKENS` 12,000 → 8,000; grouped requests get +1 fetch and +1 search.
+
+**Next:** run batches 3-12 (grouped). Run one, compare its measured cost per seat with batch 2, then continue.
+
+**Drive backup after batch 2:** `outputs/yellowbook_2026-11-19_after-batch-2.sqlite.gz` (current; restore this one), results as two Google Sheets ("after batch 2", part 1 and part 2; one CSV is now over the connector's ~3.1 MB limit), and `MANIFEST_after-batch-2.sha256`. **Raw API responses are not backed up any more:** runs 3 and 4 compress to 20 MB and 93 MB, too large for the connector, and a full run would produce about 1.5 GB. They exist only in this container (`data/raw/`). The checks table keeps the evidence that matters (source URL, evidence date, notes, flags). Owner decision pending: drop raw backups, or keep them somewhere larger (needs a storage connector that can upload files).
+
+## Usable contacts only; raw data dropped (owner decision, 2026-11-19)
+
+- The owner uses only contacts whose email is **Verified** (seen verbatim on an official page in the latest check) or **Probably fine** (person confirmed still in the seat, earlier address kept, domain receives mail). Both need a settled status at Medium or High. `npm run export -- out.csv --usable` writes just those, with "Email Quality" and "Office Mailbox" columns (`emailQuality` in `src/lib/export.ts`, tested). After batches 1-2 plus the pilot: 343 usable contacts (193 Verified, 150 Probably fine).
+- The database is kept whole (history, and the record that stops paid re-checks); only the export and the Drive copy are filtered. `npm run snapshot` writes both exports.
+- **Raw API responses are gone and no longer saved** (`STORE_RAW=false` by default; `CLAUDE.md` convention updated). About 300 MB deleted locally, `checks.raw_path` cleared, and the one raw archive on Drive moved to the Drive trash.
+- Drive `outputs/` now: **yellowbook usable contacts (2026-11-19)** (the owner's list) and `yellowbook_2026-11-19_current.sqlite.gz` (restore this one). Older copies are kept with their dates.
+
+## Batch 3 (run 5, 2026-11-19): first grouped run
+
+- Scope: all roles, population 300k and up. 1,137 seats sent as 284 requests (about 4 seats each). $9.20, **0.8 cents a seat** (batch 2, per seat: 2.5 cents). The planner estimated $21: it still prices seats one at a time.
+- Final per seat: 485 confirmed, 267 replaced, 77 role mismatch, 21 vacant or interim, 194 unclear, 93 unable to confirm.
+- **Usable contacts now 848** (300 Verified, 548 Probably fine); batch 3 added 505.
+- 5 seats errored: one grouped request read a document so large the prompt passed the 1M-token limit (PDFs are not capped by `max_content_tokens`). Not retried (invalid_request). Rare, 1 request in 284.
+- 138 of 500 grouped requests still crossed Haiku's 100k price step. Room to tune (fewer fetches per group, or 6k pages), but already 3x cheaper.
+- Drive: **yellowbook usable contacts (after batch 3)** and `yellowbook_2026-11-19_after-batch-3.sqlite.gz` (restore this one). The database is 2.2 MB compressed; it will pass the connector's ~3.1 MB limit within a few batches, so split it or find larger storage before then.
+- **Remaining:** about 6,300 seats below population 300k. At 0.8 cents a seat, roughly $50 for all of them.
+
+## Batch 4 (run 6, 2026-11-19)
+
+- Scope: all roles, population 100k to 300k, cap raised to $30 by the owner for this run (default stays $25). 2,463 seats in 620 grouped requests. **$21.63, 0.9 cents a seat.**
+- Final per seat: 1,045 confirmed, 565 replaced, 154 role mismatch, 57 vacant or interim, 374 unclear, 268 unable. 9 seats errored on the over-1M-token document problem (about 2 requests).
+- **Usable contacts now 2,010** (728 Verified, 1,282 Probably fine; 249 office mailboxes).
+- The gzipped database passed the connector limit (3.2 MB), so backups are now xz (1.9 MB): `outputs/yellowbook_2026-11-19_after-batch-4.sqlite.xz` (restore this one: download, `xz -d`). `npm run snapshot` now writes xz and only the usable export. Usable list: **yellowbook usable contacts (after batch 4)**.
+- **Remaining:** seats under population 100k (about 3,800).
+
+## Final batch (run 7) and where everything stands (2026-11-19)
+
+- Run 7: all roles under population 100k, cap $40 (owner decision for this run; default stays $25). 3,865 seats in 927 grouped requests (plus 9 starting at tier 2). **$32.40, 0.8 cents a seat**, no errors. Final per seat: 1,565 confirmed, 820 replaced, 286 role mismatch, 73 vacant or interim, 546 unclear, 575 unable.
+- **Every one of the 8,159 imported seats has been checked once.** The 587 seats with no check are extra holders added by findings (585) or by the owner (2).
+- **Total API spend, all runs: $83.52** (first estimate for everything was about $150).
+- **Usable contacts: 3,871 of 8,159 seats (47%)**: 1,592 Verified, 2,279 Probably fine; 475 are office mailboxes. By role: Finance 890, Top Appointed 830, IT 717, Deputy 702, Purchasing 600, Clerk 62, others fewer.
+- Drive `outputs/`: **yellowbook usable contacts FINAL** (part 1 of 2, larger governments; part 2 of 2, smaller), and `yellowbook_2026-11-19_final.sqlite.xz` (restore this one: download, `xz -d`). The xz database is 2.8 MB, close to the connector's ~3.1 MB limit: the next backup needs a split (`split -b 2M`, restore with `cat`) or larger storage.
+- **Open:** merge the working branch (everything since PR #4); 14 seats errored on over-1M-token documents in runs 5-6 (not retried); seats still "unable" or "unclear" can be retried after `COOLDOWN_DAYS` (30); scheduled re-checks are not built.
+
+**Usable contacts by role (2026-11-20):** Drive folder **usable contacts by role** (`1AB5WL_rOVZ0CFMM3ZZ_qivKlp5W8t6EI`), one Google Sheet per role: Finance 890, Top Appointed 830, IT 717, Deputy 702, Purchasing 600, Other roles 132 (clerk, GIS, communications and the smaller roles), 3,871 in total. Regenerate with `npm run export -- out.csv --usable --roles <role_key>`.

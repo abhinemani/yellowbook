@@ -57,7 +57,7 @@ describe('planning and the tier ladder', () => {
     expect(t1.model).toBe('claude-haiku-5-5');
     expect(t1.tools.map((t: any) => t.name)).toEqual(['web_fetch']);
     expect(t1.tools[0].allowed_domains.length).toBeGreaterThan(0);
-    expect(t1.tools[0].max_content_tokens).toBe(12000);
+    expect(t1.tools[0].max_content_tokens).toBe(8000);
     expect(t1.messages[0].content).toContain('https://');
     await collectRun(db, client, runId);
     await submitWave(db, client, runId);
@@ -280,7 +280,7 @@ describe('export', () => {
     const csv = exportCsv(db, { roles: ['head_of_purchasing'] });
     const [header, ...lines] = csv.trim().split('\n');
     expect(header.startsWith('Email Address,First Name,Last Name,Title,Government Designated Name,Person ID')).toBe(true);
-    expect(header.endsWith('Check Status,Current Name,Current Title,Current Email,Current Phone,Source URL,Confidence,Check Notes,Review State,Checked At')).toBe(true);
+    expect(header.endsWith('Check Status,Current Name,Current Title,Current Email,Current Phone,Source URL,Confidence,Check Notes,Review State,Checked At,Email Domain Status,Email Quality,Office Mailbox')).toBe(true);
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain('Not checked');
   });

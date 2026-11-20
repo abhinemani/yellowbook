@@ -44,6 +44,21 @@ With Haiku on the Batch API, a page read costs a small fraction of a cent. **A s
 
 The largest 25 purchasing seats, sync (full price): $1.02 total, $0.041 a seat. Tier 1 averaged 48k input and 790 output tokens ($0.009); tier 2 averaged 86k input, 1,450 output and 1.55 searches ($0.040). 80% of seats escalated. Token use is about 3x the assumptions below, and escalation twice the guess, so read the table below as roughly a third of the real cost until the estimator has 50 tier-1 checks. Large governments may escalate more than small ones; the next runs will show.
 
+## Haiku 5.5's 100k price step (measured 2026-11-19)
+
+Haiku 5.5 bills a request whose input passes 100,000 tokens at five times the normal rate, on every token of that request (Pricing page, "Long context pricing": each request is priced on its own, and its prompt length counts all of its input tokens). With server tools, a request's input is the total over every step of its tool loop, and each fetched page is re-read on every later step. So the number of fetches and the page size decide which side of the line a request lands on.
+
+In the first 1,361 batch responses, 14% of requests passed 100k, and they were 44% of the cost ($8.20; about $2.90 at the normal rate). Fixes: `MAX_CONTENT_TOKENS` 12,000 → 8,000 per page, and grouped requests get one extra fetch and one extra search, not one per seat. A live grouped tier-2 request for 4 seats then used 61k input tokens and cost $0.024 at batch prices (0.6 cents a seat, against 2.4 cents for single-seat tier 2).
+
+## Grouped requests (batch runs, default)
+
+All due seats of one agency at one tier go in one request (`GROUP_BY_AGENCY=true`, at most 8 seats), sharing the pages read. Single-seat agencies use the single-seat request. Stored per-seat costs are an even share of the request's cost. The estimator still assumes per-seat costs, so `plan` will overstate grouped runs until it has measured grouped checks.
+
+## Batch runs 1 and 2 (2026-11-19, per seat, before grouping)
+
+- Batch 1, the 25 hardest purchasing seats: $0.95, 3.8 cents a seat. 24 of 25 escalated.
+- Batch 2, 690 purchasing seats at population 107k and up: $17.35, 2.5 cents a seat, a third over the estimate (mostly the 100k step). 80% escalated.
+
 ## Estimates (assumptions, not measurements)
 
 Assumed per seat: tier 1 about 14,000 input and 450 output tokens, no search; tier 2 about 32,000 input and 600 output tokens plus 2 searches; 40% of seats escalate. Batch pricing, Haiku for both tiers. Computed by `npm run plan` on the four Power Almanac exports (6,360 seats).

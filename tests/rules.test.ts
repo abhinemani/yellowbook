@@ -274,3 +274,19 @@ describe('splitName', () => {
     expect(splitName('Pat Example')).toEqual({ first: 'Pat', last: 'Example' });
   });
 });
+
+import { emailQuality } from '../src/lib/export';
+describe('emailQuality: which emails the owner can use', () => {
+  const base = { k_status: 'confirmed_in_role', confidence: 'Medium', email: 'jane.doe@examplecounty.gov', found_email: null };
+  it('verified when seen on a page this check, probably fine when only the person was confirmed', () => {
+    expect(emailQuality({ ...base, found_email: 'jane.doe@examplecounty.gov' }, 'mx')).toBe('Verified');
+    expect(emailQuality(base, 'mx')).toBe('Probably fine');
+  });
+  it('not usable when the person is uncertain, confidence is Low, the domain is dead, or a new person has no email', () => {
+    expect(emailQuality({ ...base, k_status: 'unclear' }, 'mx')).toBeNull();
+    expect(emailQuality({ ...base, confidence: 'Low' }, 'mx')).toBeNull();
+    expect(emailQuality(base, 'nxdomain')).toBeNull();
+    expect(emailQuality({ ...base, k_status: 'replaced', email: null }, 'mx')).toBeNull();
+    expect(emailQuality({ ...base, k_status: 'replaced' }, 'mx')).toBeNull(); // old address kept on a new person would be wrong
+  });
+});

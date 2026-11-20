@@ -113,9 +113,11 @@ CREATE TABLE IF NOT EXISTS run_items (
   attempts     INTEGER NOT NULL DEFAULT 0,
   check_id     INTEGER,
   error        TEXT,
+  request_id   TEXT,                                        -- v3: shared by items sent together in one grouped request
   UNIQUE (run_id, seat_id, tier)
 );
 CREATE INDEX IF NOT EXISTS idx_items_run ON run_items(run_id, state);
+CREATE INDEX IF NOT EXISTS idx_items_request ON run_items(request_id);
 
 -- One verification attempt on one seat. Append-only.
 CREATE TABLE IF NOT EXISTS checks (
@@ -165,3 +167,11 @@ JOIN agencies a ON a.id = s.agency_id
 JOIN roles r    ON r.key = s.role_key
 LEFT JOIN contacts c ON c.id = s.current_contact_id
 LEFT JOIN checks k ON k.id = (SELECT id FROM checks WHERE seat_id = s.id ORDER BY checked_at DESC, id DESC LIMIT 1);
+
+-- v2: whether each contact email domain still receives mail (DNS MX lookup). Domains only; no addresses.
+CREATE TABLE IF NOT EXISTS email_domains (
+  domain      TEXT PRIMARY KEY COLLATE NOCASE,
+  status      TEXT NOT NULL CHECK (status IN ('mx','a_only','no_mail','nxdomain','error')),
+  mx_hosts    TEXT,                                   -- comma-separated, lowest preference first
+  checked_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);

@@ -80,5 +80,5 @@ If the owner's existing apps (for example Agora) use a different stack, prefer m
 
 - A **run** has a scope (filters), a model, an estimated cost shown **before** it starts, and a status.
 - Runs are **resumable and idempotent**: each (run, seat) is a row; re-running skips seats that already have a result and retries only seats whose `unresolved_reason` is `budget_exhausted`, `fetch_blocked` or `not_searched`.
-- Every API response is stored raw under `data/raw/` (git-ignored) so a result can be audited later.
+- Raw API responses are not kept by default (owner decision); each check stores its evidence: source URL, evidence date, notes and flags. `STORE_RAW=true` keeps raw responses under `data/raw/` (git-ignored) for debugging.
 - Staleness policy: a seat is "due" when its last accepted check is older than a configurable number of months (default 12) or the source data is older than 18 months.

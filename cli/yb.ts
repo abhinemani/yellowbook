@@ -7,6 +7,7 @@ import { cfg } from '../src/lib/config';
 import { openDb } from '../src/lib/db';
 import { usd } from '../src/lib/estimate';
 import { exportCsv, statusLabel } from '../src/lib/export';
+import { checkDomains } from '../src/lib/domains';
 import { importPowerAlmanac } from '../src/lib/importer';
 import { cancelRun, collectRun, createRun, getRun, planRun, refreshRunStatus, runSummary, runSync, submitWave } from '../src/lib/runs';
 import type { Scope } from '../src/lib/seats';
@@ -21,7 +22,8 @@ const HELP = `yellowbook CLI
   yb collect <runId>                 one poll-and-process pass
   yb status [runId]                  counts and dollars from the database
   yb cancel <runId>
-  yb export <out.csv> [--roles a,b]  Power Almanac columns plus check columns
+  yb export <out.csv> [--roles a,b] [--usable]  Power Almanac columns plus check columns; --usable keeps only contacts whose email you can use
+  yb domains                         check every contact email domain still receives mail (DNS only; sends no mail)
   yb compare <earlier_checked.csv>   compare stored checks with an earlier manual pass (benchmark)
 
 scope:  --roles head_of_purchasing,head_of_finance  --states MO,KS  --category county  --min-pop 50000  --max-pop N
@@ -35,7 +37,7 @@ const { values: v, positionals } = parseArgs({
     'min-pop': { type: 'string' }, 'max-pop': { type: 'string' }, limit: { type: 'string' },
     kind: { type: 'string' }, 'max-tier': { type: 'string' }, cap: { type: 'string' },
     sync: { type: 'boolean' }, yes: { type: 'boolean' }, 'include-fresh': { type: 'boolean' }, 'ignore-cooldown': { type: 'boolean' },
-    interval: { type: 'string' }, seats: { type: 'string' },
+    interval: { type: 'string' }, seats: { type: 'string' }, usable: { type: 'boolean' },
   },
 });
 const [cmd, ...rest] = positionals;
@@ -68,6 +70,7 @@ function printEstimate(db: ReturnType<typeof openDb>) {
 async function watch(db: ReturnType<typeof openDb>, runId: number) {
   const client = getClient();
   const every = Number(v.interval ?? 60) * 1000;
+  let retried = false;
   for (;;) {
     const w = await submitWave(db, client, runId);
     if (w.submitted) console.log(`submitted ${w.submitted} request(s) in ${w.batchIds.length} batch(es)`);
@@ -79,7 +82,11 @@ async function watch(db: ReturnType<typeof openDb>, runId: number) {
     if (open === 0 || run.status === 'canceled') break;
     const planned = (db.prepare(`SELECT COUNT(*) n FROM run_items WHERE run_id = ? AND state = 'planned'`).get(runId) as { n: number }).n;
     const submitted = open - planned;
-    if (submitted === 0 && w.submitted === 0) { console.log('Nothing in flight and the cap holds the rest. Raise --cap or MAX_RUN_COST_USD and run watch again.'); break; }
+    // Results just collected can plan the next tier: submit those at once instead of reading "nothing in flight" as a cap stop.
+    if (submitted === 0 && planned > 0 && w.deferredForCap === 0 && !retried) { retried = true; continue; } // escalations or retries just planned
+    retried = false;
+    if (submitted === 0 && w.submitted === 0 && w.deferredForCap > 0) { console.log('Nothing in flight and the cap holds the rest. Raise --cap or MAX_RUN_COST_USD and run watch again.'); break; }
+    if (submitted === 0 && w.submitted === 0) { console.log(`Nothing in flight; ${planned} planned item(s) were not sent. Run watch again.`); break; }
     console.log(`waiting: ${submitted} in flight, ${planned} planned. Next check in ${every / 1000}s`);
     await new Promise((r) => setTimeout(r, every));
   }
@@ -142,10 +149,18 @@ async function main() {
       await cancelRun(db, cfg().apiKey ? getClient() : null, Number(rest[0]));
       console.log('Canceled.');
       break;
+    case 'domains': {
+      const counts = await checkDomains(db);
+      const dead = db.prepare(`SELECT COUNT(*) n FROM contacts c JOIN email_domains d ON d.domain = lower(substr(c.email, instr(c.email,'@')+1))
+                               WHERE c.status = 'active' AND d.status IN ('nxdomain','no_mail')`).get() as { n: number };
+      console.log('Email domains:', counts);
+      console.log(`Active contacts on a domain that cannot receive mail: ${dead.n}`);
+      break;
+    }
     case 'export': {
       const out = rest[0];
       if (!out) throw new Error('Give an output file.');
-      fs.writeFileSync(out, exportCsv(db, { roles: v.roles?.split(','), states: v.states?.split(',') }));
+      fs.writeFileSync(out, exportCsv(db, { roles: v.roles?.split(','), states: v.states?.split(','), usable: v.usable }));
       console.log(`Wrote ${out}`);
       break;
     }

@@ -31,7 +31,7 @@ yellowbook verifies and maintains government contacts. Agencies have seats (role
 - Cost is a feature. Read `docs/COST.md` before changing tiers, models, tool limits or batch behavior, and keep the estimator (`src/lib/estimate.ts`) in step with any change.
 - Validate every model response against `schemas/check_result.schema.json`; on failure retry once, then store as `unable_to_confirm` with the validation error in notes.
 - Keep prompts in `prompts/` as templates; do not inline long prompts in code.
-- Store every raw API response under `data/raw/<run_id>/` for audit.
+- Raw API responses are not kept (owner decision, 2026-11-19: too large to back up, and the checks table holds the evidence). `STORE_RAW=true` keeps them under `data/raw/<run_id>/` when debugging.
 - UI follows `docs/DESIGN.md`: navy dominant, Open Sans (Light for headlines and big numbers), line icons in colored circles, no stock imagery, short plain titles, status shown by text label as well as color.
 - All model output enters the database through `processOutcome` in `src/lib/runs.ts`, after `applyRules` in `src/lib/rules.ts`. Do not add another path.
 - Pin tool versions in `src/lib/verifier.ts` (`web_search_20250305`, `web_fetch_20250910`, always `allowed_callers: ['direct']`). The newer dynamic-filtering versions hide page text from the response, which would break the email-on-page check.
